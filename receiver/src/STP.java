@@ -10,6 +10,7 @@ import java.io.Serializable;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.Scanner;
+import java.util.zip.CRC32;
 
 
 public class STP implements Serializable{
@@ -23,8 +24,8 @@ public class STP implements Serializable{
 	private int ackNum;
 	private byte[] data;
 	
-	public STP(long checksum, Boolean synFlag, Boolean ackFlag, Boolean finFlag, int seqNum, int ackNum){
-		this.checksum = checksum;
+	public STP(Boolean synFlag, Boolean ackFlag, Boolean finFlag, int seqNum, int ackNum){
+		this.checksum = 0;
 		this.synFlag = synFlag;
 		this.ackFlag = ackFlag;
 		this.finFlag = finFlag;
@@ -32,8 +33,8 @@ public class STP implements Serializable{
 		this.ackNum = ackNum;		
 	}
 	
-	public STP(long checksum, Boolean synFlag, Boolean ackFlag, Boolean finFlag, int seqNum, int ackNum, byte[] data){
-		this.checksum = checksum;
+	public STP( Boolean synFlag, Boolean ackFlag, Boolean finFlag, int seqNum, int ackNum, byte[] data){
+		this.checksum  = genChecksum(data);
 		this.synFlag = synFlag;
 		this.ackFlag = ackFlag;
 		this.finFlag = finFlag;
@@ -60,6 +61,17 @@ public class STP implements Serializable{
 		ObjectInputStream oIn = new ObjectInputStream(bInput);
 		return oIn.readObject();
 	}
+	
+	private long genChecksum(byte[] data) {
+		long res = 0;
+		CRC32 checksum = new CRC32();
+		checksum.update(data);
+		res = checksum.getValue();
+		System.out.println(res);
+		
+		return res;
+	}
+	
 	
 	public long getChecksum() {
 		return checksum;
