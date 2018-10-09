@@ -90,8 +90,6 @@ public class Sender {
 		currSeq = 1;
 		currAck = 1;
 		sendPacket(buffer);
-		
-
 		finnConn();
 		return;
 	}
@@ -200,20 +198,21 @@ public class Sender {
 		int recvAckNum = -1;
 		int end = 0;
 		
+		System.out.print("seq = "+outSeqNum+"\tack = "+outAckNum);
 //		send fin packet
 		stp = new STP(false, false, true, outSeqNum, outAckNum);
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
 		socket.send(outgoingPacket);
-		System.out.println("outgoingPayload length: "+outgoingPayload.length);
+//		System.out.print("outgoingPayload length: "+outgoingPayload.length+"\t|");
 		getFlag(stp);
-		System.out.println("fin packet sent\n");
+//		System.out.println("fin packet sent\n");
 		
 //		receive ack packet
 		incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 		socket.receive(incomingPacket);
 		recvObj = STP.deserialize(incomingPayload);
-		System.out.println("incoming packet size: "+incomingPayload.length);
+		System.out.print("incoming packet size: "+incomingPayload.length+"\t|");
 		getFlag(((STP) recvObj));
 		System.out.println("ack packet receive\n");
 		
@@ -221,18 +220,22 @@ public class Sender {
 		incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 		socket.receive(incomingPacket);
 		recvObj = STP.deserialize(incomingPayload);
-		System.out.println("incoming packet size: "+incomingPayload.length);
+//		System.out.print("incoming packet size: "+incomingPayload.length+"\t|");
 		getFlag(((STP) recvObj));
-		System.out.println("fin packet receive\n");
+		recvSeqNum = ((STP)recvObj).getSeqNum();
+		recvAckNum = ((STP)recvObj).getAckNum();
+//		System.out.println("fin packet receive\n");
 		
 //		send ack packet
-		stp = new STP(false, true, false, 0, 0);
+		outSeqNum = recvAckNum;
+		outAckNum = recvSeqNum+1;
+		stp = new STP(false, true, false, outSeqNum, outAckNum);
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
 		socket.send(outgoingPacket);
-		System.out.println("outgoingPayload length: "+outgoingPayload.length);
+//		System.out.print("outgoingPayload length: "+outgoingPayload.length+"\t|");
 		getFlag(stp);
-		System.out.println("ack packet sent\n");
+//		System.out.println("ack packet sent\n");
 		
 		
 		
