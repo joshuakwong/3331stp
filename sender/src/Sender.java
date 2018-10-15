@@ -1,30 +1,14 @@
-import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.ObjectOutput;
-import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Random;
-import java.util.Scanner;
-
-//TODO
-//seq and ack num
-//trigger finnConn
-//file serialization
-//checksum
-
 
 public class Sender {
 	
@@ -126,7 +110,7 @@ public class Sender {
 		
 		for (int i=0; i<segments.length; i++) {
 			outSeqNum = calcSeqNum(i);
-			System.out.print("Sender: sending segment "+i+"  outSeqNum: "+outSeqNum+"\t");
+			System.out.print("Sender: sending segment   "+i+"  outSeqNum: "+outSeqNum+"\t");
 			
 			segments[i].setExpAck(outSeqNum+segments[i].getData().length);
 			segments[i].setSentFlag(true);
@@ -159,7 +143,6 @@ public class Sender {
 
 	private static void sendAction(String inst, DatagramPacket outgoingPacket) throws IOException {
 		
-		System.out.println("inside sendAction");
 		if (inst == "send") {
 			socket.send(outgoingPacket);
 		}

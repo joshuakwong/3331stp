@@ -1,10 +1,4 @@
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Random;
-import java.util.Scanner;
 
 public class PLD {
 	
@@ -33,27 +27,27 @@ public class PLD {
 //		random = 1; System.out.println();
 		
 //		if (random < pDrop) {
-//			System.out.println("drop");
+//			System.out.println("drop"+" | random: "+random+" | pDrop: "+pDrop+"\t");
 //			return "drop";
 //		}
 		if (random < pDupl) {
-			System.out.println("dupl");
+			System.out.println("dupl"+" | random: "+random+" | pDupl: "+pDupl+"\t");
 			return "dupl";
 		}
 		if (random < pCorr) {
-			System.out.println("corr");
+			System.out.println("corr"+" | random: "+random+" | pCorr: "+pCorr+"\t");
 			corrupt(packet);
 			return "send";
 		}
 //		if (random < pOrder) {
-//			System.out.println("reord");
+//			System.out.println("reord"+" | random: "+random+" | pOrder: "+pOrder+"\t");
 //			return "reorder";
 //		}
-//		if (random < pDelay) {
-//			System.out.println("delay");
-//			return "delay";
-//		}
-		System.out.println("send");
+		if (random < pDelay) {
+			System.out.println("delay"+" | random: "+random+" | pDelay: "+pDelay+"\t");
+			return "delay";
+		}
+		System.out.println("send"+" | random: "+random+" | No action ");
 		return "send";
 	}
 	

@@ -1,6 +1,4 @@
-import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -8,9 +6,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Scanner;
 
 public class Receiver {
 	
@@ -86,7 +82,7 @@ public class Receiver {
 				socket.send(outgoingPacket);
 				expcSeq+=mss;
 				System.out.print("Seq="+outSeqNum+"\t Ack="+outAckNum+"\t| ");
-				System.out.print("Data recv: "+((STP)recvObj).getData().length+"\t  Expected SeqNum: "+expcSeq+"\n");
+				System.out.print("Data recv: "+((STP)recvObj).getData().length+"   \tExpected SeqNum: "+expcSeq+"\n");
 				
 			}
 			else {
