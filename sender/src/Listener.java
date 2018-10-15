@@ -44,13 +44,20 @@ public class Listener implements Runnable{
 				e.printStackTrace();
 			}
 		}
-		System.out.println("-----------------ending listener-----------------");
+		Sender.currAck = recvSeqNum;
+		Sender.currSeq = recvAckNum;
+		System.out.println("All ackedFlag state: ");
+		for (int i=0; i<Sender.segments.length; i++)
+			System.out.print(Sender.segments[i].isAckedFlag()+"__");
+		System.out.println("\n-----------------ending listener-----------------, exit = "+exit);
 	}
 
 	public static boolean checkAllAck() {
-		for (int i=0; i<Sender.segments.length; i++) 
+		int i=0;
+		for (i=0; i<Sender.segments.length; i++) 
 			if (Sender.segments[i].isAckedFlag() == false) return false;
 		
+//		System.out.println(i);
 		return true;
 	}
 	

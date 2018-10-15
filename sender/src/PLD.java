@@ -29,30 +29,30 @@ public class PLD {
 	
 	public String action(STP packet) {
 //		return "delay";
-//		random = rand.nextFloat();
-		random = 1; System.out.println();
+		random = rand.nextFloat();
+//		random = 1; System.out.println();
 		
-		if (random < pDrop) {
-			System.out.println("drop");
-			return "drop";
-		}
-		else if (random < pDupl) {
+//		if (random < pDrop) {
+//			System.out.println("drop");
+//			return "drop";
+//		}
+		if (random < pDupl) {
 			System.out.println("dupl");
 			return "dupl";
 		}
-		else if (random < pCorr) {
+		if (random < pCorr) {
 			System.out.println("corr");
 			corrupt(packet);
 			return "send";
 		}
-		else if (random < pOrder) {
-			System.out.println("reord");
-			return "reorder";
-		}
-		else if (random < pDelay) {
-			System.out.println("delay");
-			return "delay";
-		}
+//		if (random < pOrder) {
+//			System.out.println("reord");
+//			return "reorder";
+//		}
+//		if (random < pDelay) {
+//			System.out.println("delay");
+//			return "delay";
+//		}
 		System.out.println("send");
 		return "send";
 	}

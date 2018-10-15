@@ -1,15 +1,10 @@
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.util.Scanner;
 import java.util.zip.CRC32;
 
 
@@ -23,6 +18,8 @@ public class STP implements Serializable{
 	private int seqNum;
 	private int ackNum;
 	private byte[] data;
+	private int mss;
+	
 	
 	public STP(Boolean synFlag, Boolean ackFlag, Boolean finFlag, int seqNum, int ackNum){
 		this.checksum = 0;
@@ -30,10 +27,20 @@ public class STP implements Serializable{
 		this.ackFlag = ackFlag;
 		this.finFlag = finFlag;
 		this.seqNum = seqNum;
-		this.ackNum = ackNum;		
+		this.ackNum = ackNum;
 	}
 	
-	public STP( Boolean synFlag, Boolean ackFlag, Boolean finFlag, int seqNum, int ackNum, byte[] data){
+	public STP(Boolean synFlag, Boolean ackFlag, Boolean finFlag, int seqNum, int ackNum, int mss){
+		this.checksum = 0;
+		this.synFlag = synFlag;
+		this.ackFlag = ackFlag;
+		this.finFlag = finFlag;
+		this.seqNum = seqNum;
+		this.ackNum = ackNum;		
+		this.setMss(mss);
+	}
+	
+	public STP( Boolean synFlag, Boolean ackFlag, Boolean finFlag, int seqNum, int ackNum, byte[] data, int mss){
 		this.checksum  = genChecksum(data);
 		this.synFlag = synFlag;
 		this.ackFlag = ackFlag;
@@ -41,6 +48,7 @@ public class STP implements Serializable{
 		this.seqNum = seqNum;
 		this.ackNum = ackNum;	
 		this.data = data;
+		this.setMss(mss);
 	}
 	
 	public byte[] serialize () {
@@ -99,6 +107,14 @@ public class STP implements Serializable{
 
 	public byte[] getData() {
 		return data;
+	}
+
+	public int getMss() {
+		return mss;
+	}
+
+	public void setMss(int mss) {
+		this.mss = mss;
 	}
 	
 	

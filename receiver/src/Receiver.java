@@ -53,6 +53,9 @@ public class Receiver {
 		int recvSeqNum = -1;
 		int recvAckNum = -1;
 		List<Byte> fileDataArrayList = new ArrayList<Byte>();
+		int mss = 0;
+		int expcSeq = 1;
+		int lastRecvSeq = 0;
 		
 		
 		while (true) {
@@ -62,22 +65,36 @@ public class Receiver {
 			recvObj = STP.deserialize(incomingPayload);
 			recvSeqNum = ((STP)recvObj).getSeqNum();
 			recvAckNum = ((STP)recvObj).getAckNum();
+			int outSeqNum = 0;
+			int outAckNum = 0;
+			
+			mss = ((STP)recvObj).getMss();
 			byte[] recvBuffArray = ((STP)recvObj).getData();
-
 			
 			if (((STP)recvObj).isFinFlag()) break;
-			pushToList(fileDataArrayList, recvBuffArray);
 			
-			int outSeqNum = recvAckNum;
-			int outAckNum = recvSeqNum+((STP)recvObj).getData().length;
-			System.out.print("Seq="+outSeqNum+"\t Ack="+outAckNum+"\t| ");
-			System.out.print("Data recv: "+((STP)recvObj).getData().length+"\n");
-			
-			stp = new STP(false, false, false, outSeqNum, outAckNum);
-			outgoingPayload = stp.serialize();
-			outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, senderAddr, senderPort);
-			socket.send(outgoingPacket);
-			
+			if (expcSeq == recvSeqNum) {
+				lastRecvSeq = recvSeqNum;
+				pushToList(fileDataArrayList, recvBuffArray);
+				
+				outSeqNum = recvAckNum;
+				outAckNum = recvSeqNum+((STP)recvObj).getData().length;
+				
+				stp = new STP(false, false, false, outSeqNum, outAckNum);
+				outgoingPayload = stp.serialize();
+				outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, senderAddr, senderPort);
+				socket.send(outgoingPacket);
+				expcSeq+=mss;
+				System.out.print("Seq="+outSeqNum+"\t Ack="+outAckNum+"\t| ");
+				System.out.print("Data recv: "+((STP)recvObj).getData().length+"\t  Expected SeqNum: "+expcSeq+"\n");
+				
+			}
+			else {
+				stp = new STP(false, false, false, outSeqNum, outAckNum);
+				outgoingPayload = stp.serialize();
+				outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, senderAddr, senderPort);
+				socket.send(outgoingPacket);
+			}
 		}		
 		
 		byte[] pdfData = toArray(fileDataArrayList);
@@ -107,26 +124,20 @@ public class Receiver {
 		recvObj = STP.deserialize(incomingPayload);
 		senderAddr = incomingPacket.getAddress();
 		senderPort = incomingPacket.getPort();
-//		System.out.println("incoming packet size: "+incomingPayload.length);
 		getFlag(((STP) recvObj));
-//		System.out.println("syn packet received\n");
 		
 //		send synack packet
 		stp = new STP(true, true, false, 0, 1);
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, senderAddr, senderPort);
 		socket.send(outgoingPacket);
-//		System.out.println("outgoingPayload length: "+outgoingPayload.length);
 		getFlag(stp);
-//		System.out.println("synack packet sent\n");
 		
 //		receive ack packet
 		incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 		socket.receive(incomingPacket);
 		recvObj = STP.deserialize(incomingPayload);
-//		System.out.println("incoming packet size: "+incomingPayload.length);
 		getFlag(((STP) recvObj));
-//		System.out.println("ack packet reived\n");
 		currSeq = ((STP) recvObj).getSeqNum();
 		currAck = ((STP) recvObj).getAckNum();
 		return;
