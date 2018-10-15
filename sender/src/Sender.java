@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Random;
 import java.util.Scanner;
 
 //TODO
@@ -28,48 +29,49 @@ import java.util.Scanner;
 public class Sender {
 	
 	private static final int MAXSIZE = 1024;
-	private static DatagramSocket socket = null;
-	private static int currSeq = 0;
-	private static int currAck = 0;
+	public static DatagramSocket socket = null;
+	public static FilePacket[] segments = null;
+	public static int currSeq = 0;
+	public static int currAck = 0;
 	
 	private static InetAddress recvHost = null;
 	private static int recvPort = 0;
 	private static String file = null;
 	private static int mws = 0;
 	private static int mss = 0;
-//	private static int gamma = 0;
-//	private static double pDrop = 0;
-//	private static double pDupl = 0;
-//	private static double pCorr= 0;
-//	private static double pOrder = 0;
-//	private static int maxOrder = 0;
-//	private static double pDelay = 0;
-//	private static int maxDelay = 0;
-//	private static int seed = 0;
+	private static int gamma = 0;
+	private static double pDrop = 0;
+	private static double pDupl = 0;
+	private static double pCorr= 0;
+	private static double pOrder = 0;
+	private static int maxOrder = 0;
+	private static double pDelay = 0;
+	private static int maxDelay = 0;
+	private static int seed = 0;
 	
 	public static void main (String[] args) throws Exception{
-//		if (args.length != 14) {
-//			System.out.println("Error: Usage:");
-//			System.exit(0);
-//		}
+		if (args.length != 14) {
+			System.out.println("Error: Usage:");
+			System.exit(0);
+		}
 		
 		recvHost = InetAddress.getByName(args[0]);
 		recvPort = Integer.parseInt(args[1]);
 		file = args[2];
 		mws = Integer.parseInt(args[3]);
 		mss = Integer.parseInt(args[4]);
-//		gamma = Integer.parseInt(args[5]);
-//		pDrop = Double.parseDouble(args[6]);
-//		pDupl = Double.parseDouble(args[7]);
-//		pCorr = Double.parseDouble(args[8]);
-//		pOrder = Double.parseDouble(args[9]);
-//		maxOrder = Integer.parseInt(args[10]);
-//		pDelay = Double.parseDouble(args[11]);
-//		maxDelay = Integer.parseInt(args[12]);
-//		seed = Integer.parseInt(args[13]);
+		gamma = Integer.parseInt(args[5]);
+		pDrop = Double.parseDouble(args[6]);
+		pDupl = Double.parseDouble(args[7]);
+		pCorr = Double.parseDouble(args[8]);
+		pOrder = Double.parseDouble(args[9]);
+		maxOrder = Integer.parseInt(args[10]);
+		pDelay = Double.parseDouble(args[11]);
+		maxDelay = Integer.parseInt(args[12]);
+		seed = Integer.parseInt(args[13]);
 		
-//		boolean validated = validate(recvPort, mws, mss, gamma, pDrop, pDupl, pCorr, pOrder, maxOrder, pDelay, maxDelay, seed);
-//		if (validated == false) System.exit(1);
+		boolean validated = validate(recvPort, mws, mss, gamma, pDrop, pDupl, pCorr, pOrder, maxOrder, pDelay, maxDelay, seed);
+		if (validated == false) System.exit(1);
 		
 		STP buffObj = null;
 		
@@ -87,16 +89,16 @@ public class Sender {
 		
 		buffObj = initConn();
 		byte[] buffer = pdfToArray(path);
+		segments = to2D(buffer);
 		currSeq = 1;
 		currAck = 1;
-		sendPacket(buffer);
+		sendPacket(segments);
 		finnConn();
 		return;
 	}
-	
 
 	
-	private static void sendPacket (byte[] pdfArray) throws IOException, ClassNotFoundException {
+	private static void sendPacket (FilePacket[] segments) throws IOException, ClassNotFoundException {
 		STP stp = null;
 		Object recvObj = null;
 		DatagramPacket incomingPacket = null;
@@ -105,47 +107,107 @@ public class Sender {
 		byte[] outgoingPayload = null;
 		int outSeqNum = currSeq;
 		int outAckNum = currAck;
-		int recvSeqNum = -1;
-		int recvAckNum = -1;
-		int end = 0;
+//		int recvSeqNum = -1;
+//		int recvAckNum = -1;
+		String inst = null;
 		
-		for (int i=0; i<pdfArray.length; i+=mss) {
-			byte[] dataSeg= new byte[mss];
+		
+		Listener listener = new Listener(socket);
+		Thread listenerThread = new Thread(listener);
+		listenerThread.start();
+		
+		
+		PLD pldModule = new PLD(pDrop, pDupl, pCorr, pOrder, pDelay, seed);
+		for (int i=0; i<segments.length; i++) {
+			System.out.print("Sender: sending segment "+i+"\t");
+			outSeqNum = calcSeqNum(i);
 			
-			if (i+mss-1 >= pdfArray.length) end = pdfArray.length;
-			else end = i+mss;
-			
-			dataSeg = Arrays.copyOfRange(pdfArray, i, end);
-			
-			System.out.print("segment: "+i+"\t"+end+"\t| ");
-			System.out.print("Seq="+outSeqNum+"\tAck="+outAckNum+"\t| ");
-			System.out.println(dataSeg.length);
-			
-			stp = new STP(false, false, false, outSeqNum, outAckNum, dataSeg);
-			outgoingPayload = stp.serialize();
+			segments[i].setExpAck(outSeqNum+segments[i].getData().length);
+			segments[i].setSentFlag(true);
+			stp = new STP(false, false, false, outSeqNum, 1, segments[i].getData());
+			inst = pldModule.action(stp);
+			outgoingPayload = stp.serialize();	
 			outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
-			socket.send(outgoingPacket);
 			
-			incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
-			socket.receive(incomingPacket);
-			recvObj = STP.deserialize(incomingPayload);
+			if (inst == "send") {
+				socket.send(outgoingPacket);
+			}
 			
-			recvSeqNum = ((STP) recvObj).getSeqNum();
-			recvAckNum = ((STP) recvObj).getAckNum();
-			outSeqNum = recvAckNum;
-			outAckNum = recvSeqNum;
+			if (inst == "delay") {
+				try {
+					int sleep = new Random().nextInt(maxDelay)+1;
+					Thread.sleep(sleep);
+					socket.send(outgoingPacket);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			
+			if (inst == "drop") {
+				continue;
+			}
+			
+			if (inst == "dupl") {
+				socket.send(outgoingPacket);
+				socket.send(outgoingPacket);
+			}
+
+//			dunno what to do...
+			if (inst == "reorder") {
+				System.out.println("hit order");
+//				TODO
+//				need to be able to reorder, then send packet
+			}
+			
+			
+//			incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
+//			socket.receive(incomingPacket);
+//			recvObj = STP.deserialize(incomingPayload);
+//			
+//			recvSeqNum = ((STP) recvObj).getSeqNum();
+//			recvAckNum = ((STP) recvObj).getAckNum();
+//			outSeqNum = recvAckNum;
+//			outAckNum = recvSeqNum;
 			
 		}
 		currSeq = outSeqNum;
 		currAck = outAckNum;
+				
+		while (listenerThread.isAlive()) {
+			try {
+				Thread.sleep(10);
+			} catch (Exception e) {
+			}
+		}
+
 		
-//		stp = new STP(false, false, true, outSeqNum, outAckNum);
-//		outgoingPayload = stp.serialize();
-//		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
-//		socket.send(outgoingPacket);
-		
+		System.out.println("-----------------ending sendFile-----------------");
 	}
+
+
 	
+	private static FilePacket[] to2D(byte[] buffer) {
+		int len = 0;
+		if (buffer.length%mss == 0) len = buffer.length/mss;
+		else len = buffer.length/mss +1;
+		int end = 0;
+		
+		FilePacket[] segments =  new FilePacket[len];
+		
+		int count = 0;
+		for (int i=0; i<buffer.length; i+=mss) {
+			byte[] dataSeg= new byte[mss];
+			
+			if (i+mss-1 >= buffer.length) end = buffer.length;
+			else end = i+mss;
+			dataSeg = Arrays.copyOfRange(buffer, i, end);
+			FilePacket tmp = new FilePacket(dataSeg, i, end);
+			segments[count] = tmp;
+			count++;
+		}
+		return segments;	
+	}
+		
 	private static STP initConn () throws IOException, ClassNotFoundException  {
 		STP stp = null;
 		Object recvObj = null;
@@ -159,32 +221,29 @@ public class Sender {
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
 		socket.send(outgoingPacket);
-//		System.out.println("outgoingPayload length: "+outgoingPayload.length);
-		getFlag(stp);
-//		System.out.println("syn packet sent\n");
-		
+//		getFlag(stp);
 		
 //		receive synack
 		incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 		socket.receive(incomingPacket);
 		recvObj = STP.deserialize(incomingPayload);
-//		System.out.println("incoming packet size: "+incomingPayload.length);
-		getFlag(((STP) recvObj));
-//		System.out.println("synack packet receive\n");
-		
+//		getFlag(((STP) recvObj));
 		
 //		send ack packet
 		stp = new STP(false, true, false, 1, 1);
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
 		socket.send(outgoingPacket);
-//		System.out.println("outgoingPayload length: "+outgoingPayload.length);
-		getFlag(stp);
-//		System.out.println("ack packet sent\n");
+//		getFlag(stp);
+		
+		
+		try {
+		Thread.sleep(100);
+		}catch(Exception e){}
 		
 		return stp;
 	}
-
+	
 	private static void finnConn() throws IOException, ClassNotFoundException {
 		STP stp = null;
 		Object recvObj = null;
@@ -198,33 +257,27 @@ public class Sender {
 		int recvAckNum = -1;
 		int end = 0;
 		
-		System.out.print("seq = "+outSeqNum+"\tack = "+outAckNum);
+//		System.out.print("seq = "+outSeqNum+"\tack = "+outAckNum);
 //		send fin packet
 		stp = new STP(false, false, true, outSeqNum, outAckNum);
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
 		socket.send(outgoingPacket);
-//		System.out.print("outgoingPayload length: "+outgoingPayload.length+"\t|");
-		getFlag(stp);
-//		System.out.println("fin packet sent\n");
+//		getFlag(stp);
 		
 //		receive ack packet
 		incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 		socket.receive(incomingPacket);
 		recvObj = STP.deserialize(incomingPayload);
-		System.out.print("incoming packet size: "+incomingPayload.length+"\t|");
-		getFlag(((STP) recvObj));
-		System.out.println("ack packet receive\n");
+//		getFlag(((STP) recvObj));
 		
 //		receive fin packet
 		incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 		socket.receive(incomingPacket);
 		recvObj = STP.deserialize(incomingPayload);
-//		System.out.print("incoming packet size: "+incomingPayload.length+"\t|");
-		getFlag(((STP) recvObj));
+//		getFlag(((STP) recvObj));
 		recvSeqNum = ((STP)recvObj).getSeqNum();
 		recvAckNum = ((STP)recvObj).getAckNum();
-//		System.out.println("fin packet receive\n");
 		
 //		send ack packet
 		outSeqNum = recvAckNum;
@@ -233,11 +286,7 @@ public class Sender {
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
 		socket.send(outgoingPacket);
-//		System.out.print("outgoingPayload length: "+outgoingPayload.length+"\t|");
 		getFlag(stp);
-//		System.out.println("ack packet sent\n");
-		
-		
 		
 		return;
 	}
@@ -263,13 +312,16 @@ public class Sender {
 				try {
 					inputStream.close();
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 			}
 		}
 		return bOut.toByteArray();
 		
+	}
+
+	private static int calcSeqNum(int segmentCount) {
+		return mss*segmentCount+1;
 	}
 
 	private static boolean validate (int recvPort, int mws, int mss, int gamma, double pDrop, double pDupl, double pCorr, double pOrder, int maxOrder, double pDelay, int maxDelay, int seed) {
@@ -337,10 +389,12 @@ public class Sender {
 	}
 
 //	debugging function
+	
+	
 	private static void getFlag(STP obj) {
+//		System.out.print(">>>>>>>>>>>>>>>>>>>>");
 		System.out.print("seq: "+ obj.getSeqNum()+"\t");
 		System.out.print("ack: "+ obj.getAckNum()+"\t");
-		
 		if (obj.isSynFlag().booleanValue()) System.out.print("Syn\t");
 		if (obj.isAckFlag().booleanValue()) System.out.print("Ack\t");
 		if (obj.isFinFlag().booleanValue()) System.out.print("Fin\t");

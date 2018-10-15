@@ -99,6 +99,8 @@ public class Receiver {
 		byte[] incomingPayload = new byte[MAXSIZE];
 		byte[] outgoingPayload = null;
 		
+		System.out.println("-----------------connection initiate-----------------");
+		
 //		receive syn packet
 		incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 		socket.receive(incomingPacket);
@@ -149,8 +151,6 @@ public class Receiver {
 		getFlag(((STP) recvObj));
 		recvSeqNum = ((STP)recvObj).getSeqNum();
 		recvAckNum = ((STP)recvObj).getAckNum();
-		System.out.print("incoming packet size: "+incomingPayload.length+"\t|");
-		System.out.println("fin packet receive\n");
 		
 //		send ack packet
 //		if (recvObj == null) System.out.println("recvObj null");
@@ -160,26 +160,20 @@ public class Receiver {
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, senderAddr, senderPort);
 		socket.send(outgoingPacket);
-		System.out.print("outgoingPayload length: "+outgoingPayload.length+"\t|");
 		getFlag(stp);
-		System.out.println("ack packet sent\n");
 		
 //		send fin packet
 		stp = new STP(false, false, true, outSeqNum, outAckNum);
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, senderAddr, senderPort);
 		socket.send(outgoingPacket);
-		System.out.print("outgoingPayload length: "+outgoingPayload.length+"\t|");
 		getFlag(stp);
-		System.out.println("fin packet sent\n");
 		
 //		receive ack packet
 		incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 		socket.receive(incomingPacket);
 		recvObj = STP.deserialize(incomingPayload);
-		System.out.print("incoming packet size: "+incomingPayload.length+"\t|");
 		getFlag(((STP) recvObj));
-		System.out.println("ack packet receive\n");
 		
 		return;
 	}
