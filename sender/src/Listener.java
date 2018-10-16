@@ -43,12 +43,13 @@ public class Listener implements Runnable{
 			} catch (IOException | ClassNotFoundException e) {
 				e.printStackTrace();
 			}
+			System.out.println();
 		}
 		Sender.currAck = recvSeqNum;
 		Sender.currSeq = recvAckNum;
-//		System.out.println("All ackedFlag state: ");
-//		for (int i=0; i<Sender.segments.length; i++)
-//			System.out.print(Sender.segments[i].isAckedFlag()+"__");
+		System.out.println("All ackedFlag state: ");
+		for (int i=0; i<Sender.segments.length; i++)
+			System.out.print(Sender.segments[i].isAckedFlag()+"__");
 		System.out.println("\n-----------------ending listener-----------------");
 	}
 
@@ -57,7 +58,6 @@ public class Listener implements Runnable{
 		for (i=0; i<Sender.segments.length; i++) 
 			if (Sender.segments[i].isAckedFlag() == false) return false;
 		
-//		System.out.println(i);
 		return true;
 	}
 	

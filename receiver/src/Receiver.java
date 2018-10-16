@@ -7,6 +7,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.zip.CRC32;
 
 public class Receiver {
 	
@@ -46,8 +47,12 @@ public class Receiver {
 		DatagramPacket outgoingPacket = null;
 		byte[] incomingPayload = new byte[5000];
 		byte[] outgoingPayload = null;
+		byte[] recvBuffArray = null;
 		int recvSeqNum = -1;
 		int recvAckNum = -1;
+		long checksum;
+		long generatedChecksum;
+		
 		List<Byte> fileDataArrayList = new ArrayList<Byte>();
 		int mss = 0;
 		int expcSeq = 1;
@@ -61,16 +66,22 @@ public class Receiver {
 			recvObj = STP.deserialize(incomingPayload);
 			recvSeqNum = ((STP)recvObj).getSeqNum();
 			recvAckNum = ((STP)recvObj).getAckNum();
+			recvBuffArray = ((STP)recvObj).getData();
 			int outSeqNum = 0;
 			int outAckNum = 0;
 			
 			mss = ((STP)recvObj).getMss();
-			byte[] recvBuffArray = ((STP)recvObj).getData();
-			
 			if (((STP)recvObj).isFinFlag()) break;
 			
-			if (expcSeq == recvSeqNum) {
+			checksum = ((STP)recvObj).getChecksum();
+			generatedChecksum = genChecksum(recvBuffArray);
+			if (checksum != generatedChecksum) {
+				System.out.println("packed corrupted");
+			}
+			
+			else if (expcSeq == recvSeqNum) {
 				lastRecvSeq = recvSeqNum;
+				
 				pushToList(fileDataArrayList, recvBuffArray);
 				
 				outSeqNum = recvAckNum;
@@ -82,10 +93,11 @@ public class Receiver {
 				socket.send(outgoingPacket);
 				expcSeq+=mss;
 				System.out.print("Seq="+outSeqNum+"\t Ack="+outAckNum+"\t| ");
-				System.out.print("Data recv: "+((STP)recvObj).getData().length+"   \tExpected SeqNum: "+expcSeq+"\n");
+				System.out.print("Data recv: "+((STP)recvObj).getData().length+"   \tExpected SeqNum: "+expcSeq+"  \tCorrect Sequence"+"\n");
 				
 			}
 			else {
+				System.out.println("Incorrece sequence");
 				stp = new STP(false, false, false, outSeqNum, outAckNum);
 				outgoingPayload = stp.serialize();
 				outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, senderAddr, senderPort);
@@ -205,6 +217,15 @@ public class Receiver {
 		return data;
 	}
 
+	private static long genChecksum(byte[] data) {
+		long res = 0;
+		CRC32 checksum = new CRC32();
+		checksum.update(data);
+		res = checksum.getValue();
+		
+		return res;
+	}
+	
 	
 //	debugging function
 	private static void getFlag(STP obj) {

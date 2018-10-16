@@ -75,11 +75,9 @@ public class STP implements Serializable{
 		CRC32 checksum = new CRC32();
 		checksum.update(data);
 		res = checksum.getValue();
-//		System.out.println(res);
 		
 		return res;
 	}
-	
 	
 	public long getChecksum() {
 		return checksum;

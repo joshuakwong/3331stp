@@ -14,7 +14,7 @@ public class FilePacket {
 		this.endNum = endNum;
 		this.sentFlag = false;
 		this.ackedFlag = false;
-		this.expAck = 0;
+		this.expAck = -1;
 	}
 
 	public byte[] getData() {

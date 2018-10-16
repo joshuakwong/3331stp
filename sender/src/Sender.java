@@ -18,6 +18,9 @@ public class Sender {
 	public static int currSeq = 0;
 	public static int currAck = 0;
 	
+	public static DatagramPacket reorderedPacket = null;
+	public static int reorderExpPos = -1;
+	
 	private static InetAddress recvHost = null;
 	private static int recvPort = 0;
 	private static String file = null;
@@ -109,6 +112,20 @@ public class Sender {
 		System.out.println();
 		
 		for (int i=0; i<segments.length; i++) {
+//			try {
+//				Thread.sleep(1000);
+//			}catch (Exception e) {}
+			
+			
+			if (reorderExpPos == i) {
+//				send the staged packet first
+				System.out.println("sending reordered packet>>>>>>>>>>>>>>>>>>>>");
+				socket.send(reorderedPacket);
+//				reset reordering variables
+				reorderExpPos = -1;
+				reorderedPacket = null;
+			}
+			
 			outSeqNum = calcSeqNum(i);
 			System.out.print("Sender: sending segment   "+i+"  outSeqNum: "+outSeqNum+"\t");
 			
@@ -119,21 +136,25 @@ public class Sender {
 			outgoingPayload = stp.serialize();	
 			outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
 			
-			sendAction(inst, outgoingPacket);
+			sendAction(inst, outgoingPacket, i);
 
-		
+			
 //			recvSeqNum = ((STP) recvObj).getSeqNum();
 //			recvAckNum = ((STP) recvObj).getAckNum();
 //			outSeqNum = recvAckNum;
 //			outAckNum = recvSeqNum;
 			
 		}
+		if (reorderExpPos == segments.length) {
+			System.out.println("reordering at the end");
+			socket.send(reorderedPacket);
+		}
 		currSeq = outSeqNum;
 		currAck = outAckNum;
 				
 		while (listenerThread.isAlive()) {
 			try {
-				Thread.sleep(10);
+				Thread.sleep(5);
 			} catch (Exception e) {
 			}
 		}
@@ -141,10 +162,11 @@ public class Sender {
 		System.out.println("-----------------ending sendFile-----------------");
 	}
 
-	private static void sendAction(String inst, DatagramPacket outgoingPacket) throws IOException {
+	private static void sendAction(String inst, DatagramPacket outgoingPacket, int position) throws IOException {
 		
 		if (inst == "send") {
 			socket.send(outgoingPacket);
+			return;
 		}
 		
 		if (inst == "delay") {
@@ -155,6 +177,7 @@ public class Sender {
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
+			return;
 		}
 		
 		if (inst == "drop") {
@@ -164,16 +187,29 @@ public class Sender {
 		if (inst == "dupl") {
 			socket.send(outgoingPacket);
 			socket.send(outgoingPacket);
+			return;
 		}
 
 //		dunno what to do...
 		if (inst == "reorder") {
-			System.out.println("hit order");
 //			TODO
-//			need to be able to reorder, then send packet
+//			store the packet in a variable, along with the position.
+//			if reach that position, use sendPacket to send it
+			
+//			if there are staged packet already, send the packet right away
+			if (reorderedPacket != null) {
+				socket.send(outgoingPacket);
+				return;
+			}
+			
+			else {
+				reorderedPacket = outgoingPacket;
+				if (position+(mws/mss) < segments.length) reorderExpPos = position+(mws/mss);
+				else reorderExpPos = segments.length;
+				
+				System.out.println("hit order: reorderExpectedPosition: "+reorderExpPos);
+			}	
 		}
-		
-		
 		
 		
 		return;
@@ -203,6 +239,7 @@ public class Sender {
 		}
 		return segments;	
 	}
+	
 		
 	private static STP initConn () throws IOException, ClassNotFoundException  {
 		STP stp = null;
@@ -400,13 +437,6 @@ public class Sender {
 	}
 	
 }
-
-
-
-
-
-
-
 
 
 
