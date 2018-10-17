@@ -54,30 +54,43 @@ public class Receiver {
 		long generatedChecksum;
 		
 		List<Byte> fileDataArrayList = new ArrayList<Byte>();
+		List<Byte> outOfOrderBuffer = new ArrayList<Byte>();
 		int mss = 0;
 		int expcSeq = 1;
-		int lastRecvSeq = 0;
+		int lastRecvSeq = 1;
 		
+		int outSeqNum = 1;
+		int outAckNum = 1;
 		
 		while (true) {
 			incomingPacket = new DatagramPacket(incomingPayload, 5000);
 			socket.receive(incomingPacket);	
-			recvObj = null;
 			recvObj = STP.deserialize(incomingPayload);
 			recvSeqNum = ((STP)recvObj).getSeqNum();
 			recvAckNum = ((STP)recvObj).getAckNum();
 			recvBuffArray = ((STP)recvObj).getData();
-			int outSeqNum = 0;
-			int outAckNum = 0;
-			
 			mss = ((STP)recvObj).getMss();
-			if (((STP)recvObj).isFinFlag()) break;
-			
 			checksum = ((STP)recvObj).getChecksum();
+			System.out.print("recvSeqNum: "+recvSeqNum+"  \t recvAckNum: "+recvAckNum+"\t");
+						
+			if (((STP)recvObj).isFinFlag()) break;
 			generatedChecksum = genChecksum(recvBuffArray);
+			
+			
+//			checksum mismatch, duplicated packet
 			if (checksum != generatedChecksum) {
 				System.out.println("packed corrupted");
 			}
+			
+			
+			else if (expcSeq != recvSeqNum) {
+				System.out.println("Incorrece sequence"+"outSeqNum = "+outSeqNum+"   outAckNum = "+outAckNum);
+				stp = new STP(false, false, false, outSeqNum, outAckNum);
+				outgoingPayload = stp.serialize();
+				outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, senderAddr, senderPort);
+				socket.send(outgoingPacket);
+			}
+			
 			
 			else if (expcSeq == recvSeqNum) {
 				lastRecvSeq = recvSeqNum;
@@ -92,18 +105,20 @@ public class Receiver {
 				outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, senderAddr, senderPort);
 				socket.send(outgoingPacket);
 				expcSeq+=mss;
-				System.out.print("Seq="+outSeqNum+"\t Ack="+outAckNum+"\t| ");
-				System.out.print("Data recv: "+((STP)recvObj).getData().length+"   \tExpected SeqNum: "+expcSeq+"  \tCorrect Sequence"+"\n");
-				
+//				System.out.print("Seq="+outSeqNum+"\t Ack="+outAckNum+"\t| ");
+				System.out.print("Correct Sequence\t"+"Expected SeqNum: "+expcSeq+"\n");
 			}
-			else {
-				System.out.println("Incorrece sequence");
+
+//			Duplicated Packet, resend the same ack packet
+			else if (lastRecvSeq == recvSeqNum) {
+				System.out.println("Duplicated Packet   "+"outSeqNum = "+outSeqNum+"   outAckNum = "+outAckNum);
 				stp = new STP(false, false, false, outSeqNum, outAckNum);
 				outgoingPayload = stp.serialize();
 				outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, senderAddr, senderPort);
 				socket.send(outgoingPacket);
 			}
-		}		
+
+		}
 		
 		byte[] pdfData = toArray(fileDataArrayList);
 		OutputStream out = new FileOutputStream(new File(file));
@@ -166,7 +181,7 @@ public class Receiver {
 		
 //		receive fin packet
 		recvObj = fromPrev;
-		System.out.println("incoming packet size: "+incomingPayload.length);
+//		System.out.println("incoming packet size: "+incomingPayload.length);
 		getFlag(((STP) recvObj));
 		recvSeqNum = ((STP)recvObj).getSeqNum();
 		recvAckNum = ((STP)recvObj).getAckNum();
@@ -208,6 +223,21 @@ public class Receiver {
 		
 	}
 	
+//	private static boolean exists (List<Byte> list, byte[] data) {
+//		if (data == null) {
+//			System.out.println("null data array");
+//			return false;
+//		}
+//		
+//		Byte[] tmp = new Byte[data.length];
+//		int i=0;
+//		for(byte b : data) tmp[i++] = b;
+//		
+//		if (list.contains(tmp))
+//		
+//		return false;
+//	}
+	
 	private static byte[] toArray(List<Byte> list){
 		Object[] tmp = list.toArray();
 		byte[] data = new byte[tmp.length];
@@ -243,6 +273,7 @@ public class Receiver {
 	
 	
 }
+
 
 
 

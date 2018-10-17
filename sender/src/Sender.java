@@ -18,6 +18,7 @@ public class Sender {
 	public static int currSeq = 0;
 	public static int currAck = 0;
 	
+	
 	public static DatagramPacket reorderedPacket = null;
 	public static int reorderExpPos = -1;
 	
@@ -86,97 +87,147 @@ public class Sender {
 
 	
 	private static void sendPacket (FilePacket[] segments) throws IOException, ClassNotFoundException {
-		STP stp = null;
 		Object recvObj = null;
 		DatagramPacket incomingPacket = null;
-		DatagramPacket outgoingPacket = null;
+		
 		byte[] incomingPayload = new byte[5000];
-		byte[] outgoingPayload = null;
 		int outSeqNum = currSeq;
 		int outAckNum = currAck;
 //		int recvSeqNum = -1;
 //		int recvAckNum = -1;
-		String inst = null;
+		
 		
 		
 		Listener listener = new Listener(socket);
 		Thread listenerThread = new Thread(listener);
 		listenerThread.start();
-		
+			
 		
 		PLD pldModule = new PLD(pDrop, pDupl, pCorr, pOrder, pDelay, seed);
 		
-		System.out.println("All ackedFlag state before start: ");
-		for (int i=0; i<Sender.segments.length; i++)
-			System.out.print(Sender.segments[i].isAckedFlag()+"_");
-		System.out.println();
-		
 		for (int i=0; i<segments.length; i++) {
-//			try {
-//				Thread.sleep(1000);
-//			}catch (Exception e) {}
 			
+//			checking for mss
+//			if reached, trap in loop and sleep
+			while (checkWindow() == true) {
+				System.out.print("----------mss reached----------\r");
+				int last = 0;
+				if ((last = checkTimeout()) != -1) {
+					System.out.println("timeout++++++++++++++++++++++++++++, now send: "+ last);
+					for (int y=0; y < (mws/mss); y++) {
+						if ((y+last) == (reorderExpPos-maxOrder)) {
+							reorderExpPos = -1;
+							reorderedPacket = null;
+						}
+						sendAction((y+last), pldModule);
+					}
+				}
+				try {
+					Thread.sleep(1);
+				}catch (Exception e) {}
+			}
 			
+			sendAction(i, pldModule);
+			
+//			check for staged packets.
+//			if there are any, check and see if it is time to send
+//			reset 2 variables afterwards
 			if (reorderExpPos == i) {
 //				send the staged packet first
-				System.out.println("sending reordered packet>>>>>>>>>>>>>>>>>>>>");
-				socket.send(reorderedPacket);
+				int originalPos = reorderExpPos-maxOrder;
+				if (segments[originalPos].isAckedFlag() == false) {
+					System.out.println("sending reordered packet>>>>>>>>>>>>>>>>>>>>");
+					socket.send(reorderedPacket);
+				}
 //				reset reordering variables
 				reorderExpPos = -1;
 				reorderedPacket = null;
 			}
 			
-			outSeqNum = calcSeqNum(i);
-			System.out.print("Sender: sending segment   "+i+"  outSeqNum: "+outSeqNum+"\t");
-			
-			segments[i].setExpAck(outSeqNum+segments[i].getData().length);
-			segments[i].setSentFlag(true);
-			stp = new STP(false, false, false, outSeqNum, 1, segments[i].getData(), mss);
-			inst = pldModule.action(stp);
-			outgoingPayload = stp.serialize();	
-			outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
-			
-			sendAction(inst, outgoingPacket, i);
-
-			
-//			recvSeqNum = ((STP) recvObj).getSeqNum();
-//			recvAckNum = ((STP) recvObj).getAckNum();
-//			outSeqNum = recvAckNum;
-//			outAckNum = recvSeqNum;
-			
-		}
-		if (reorderExpPos == segments.length) {
-			System.out.println("reordering at the end");
-			socket.send(reorderedPacket);
-		}
-		currSeq = outSeqNum;
-		currAck = outAckNum;
-				
-		while (listenerThread.isAlive()) {
-			try {
-				Thread.sleep(5);
-			} catch (Exception e) {
-			}
 		}
 		
+
+		while (checkWindow() == true) {
+			System.out.print("----------mss reached----------\r");
+			int last = 0;
+			if ((last = checkTimeout()) != -1) {
+				System.out.println("timeout++++++++++++++++++++++++++++, now send: "+ last);
+				for (int y=0; y < (mws/mss); y++) {
+					if ((y+last) == (reorderExpPos-maxOrder)) {
+						reorderExpPos = -1;
+						reorderedPacket = null;
+					}
+					sendAction((y+last), pldModule);
+				}
+			}
+			try {
+				Thread.sleep(100);
+			}catch (Exception e) {}
+		}
+		
+		
+		
+		currSeq = outSeqNum;
+		currAck = outAckNum;
+		
+//		keep staying in the loop until listenerThread is killed
+//		listenerThread kill only if all ack-backs have been received
+		while (listenerThread.isAlive()) {
+			try {
+				Thread.sleep(1);
+			} catch (Exception e) {}
+		}
 		System.out.println("-----------------ending sendFile-----------------");
 	}
 
-	private static void sendAction(String inst, DatagramPacket outgoingPacket, int position) throws IOException {
+	private static void sendAction(int segCount, PLD pldModule) throws IOException{
+		String inst = null;
+		STP stp = null;
+		int outSeqNum;
+		DatagramPacket outgoingPacket = null;
+		byte[] outgoingPayload = null;
+
 		
-		if (inst == "send") {
+		outSeqNum = calcSeqNum(segCount);
+		
+		segments[segCount].setExpAck(outSeqNum+segments[segCount].getData().length);
+		segments[segCount].setSentFlag(true);
+		segments[segCount].setStartTime(System.currentTimeMillis());
+		
+		stp = new STP(false, false, false, outSeqNum, 1, segments[segCount].getData(), mss);
+		inst = pldModule.action(stp);
+		outgoingPayload = stp.serialize();	
+		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
+		
+		System.out.println("Sender: sending segment   "+segCount+"  outSeqNum: "+outSeqNum+"\t expcSeqNum: "
+		+(outSeqNum+segments[segCount].getData().length)+"\t inst: "+ inst);
+		determinePLD(inst, outgoingPacket, segCount);
+		
+	}
+	
+	
+	private static void determinePLD(String inst, DatagramPacket outgoingPacket, int position) throws IOException {
+		
+		if (inst == "send" || inst == "corr") {
 			socket.send(outgoingPacket);
 			return;
 		}
 		
 		if (inst == "delay") {
-			try {
-				int sleep = new Random().nextInt(maxDelay)+1;
-				Thread.sleep(sleep);
-				socket.send(outgoingPacket);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+			Thread threadhandle = new Thread(new Runnable() { 
+				@Override 
+				public void run() { 
+					try {
+						int sleep = new Random().nextInt(maxDelay)+1;
+						Thread.sleep(sleep);
+						Sender.socket.send(outgoingPacket);
+						System.out.println("delayed packet "+position+" sent________________________________");
+					} catch (InterruptedException | IOException e) {
+						e.printStackTrace();
+					}
+				} 
+			}); 
+			threadhandle.start();
 			return;
 		}
 		
@@ -190,22 +241,22 @@ public class Sender {
 			return;
 		}
 
-//		dunno what to do...
 		if (inst == "reorder") {
-//			TODO
 //			store the packet in a variable, along with the position.
 //			if reach that position, use sendPacket to send it
 			
 //			if there are staged packet already, send the packet right away
 			if (reorderedPacket != null) {
+				System.out.println("exists reordering packet previously: "+(reorderExpPos-maxOrder));
 				socket.send(outgoingPacket);
 				return;
 			}
 			
 			else {
+//				if (position+(mws/mss) < segments.length) reorderExpPos = position+(mws/mss);
+//				else reorderExpPos = segments.length;
+				reorderExpPos = position+(mws/mss);
 				reorderedPacket = outgoingPacket;
-				if (position+(mws/mss) < segments.length) reorderExpPos = position+(mws/mss);
-				else reorderExpPos = segments.length;
 				
 				System.out.println("hit order: reorderExpectedPosition: "+reorderExpPos);
 			}	
@@ -215,7 +266,41 @@ public class Sender {
 		return;
 	}
 	
+	/*
+	 * check if the leftmost unacked packet has timeout yet
+	 */
+	private static int checkTimeout() {
+		long currTime = System.currentTimeMillis();
+		int firstUnackedPackage = firstUnacked();
+		long timeoutInterval = 500 + (gamma*250);
+		
+		if (segments[firstUnackedPackage].getStartTime()+timeoutInterval < currTime) 
+			return firstUnackedPackage;
+		
+		return -1;
+	}
 	
+	private static int firstUnacked() {
+		for (int i=0; i<segments.length; i++) 
+			if (segments[i].isAckedFlag() == false) return i;
+		
+		return -1;
+	}
+	
+	private static boolean checkWindow() {
+		int countSentFlags = 0;
+		int countAckedFlags = 0;
+		
+		for (int i=0; i<segments.length; i++) 
+			if (segments[i].isSentFlag() == true) countSentFlags++;
+		
+		for (int i=0; i<segments.length; i++) 
+			if (segments[i].isAckedFlag() == true) countAckedFlags++;
+		
+		if ((countSentFlags - countAckedFlags) >= (mws/mss)) return true;
+		return false;
+
+	}
 	
 	
 	private static FilePacket[] to2D(byte[] buffer) {

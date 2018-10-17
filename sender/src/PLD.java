@@ -22,26 +22,26 @@ public class PLD {
 	
 	
 	public String action(STP packet) {
-//		random = rand.nextFloat();
-		random = 1; System.out.println();
+		random = rand.nextFloat();
+//		random = 1; System.out.println();
 		
-//		if (random < pDrop) {
-//			System.out.println("drop"+" | random: "+random+" | pDrop: "+pDrop+"\t");
-//			return "drop";
-//		}
-//		if (random < pDupl) {
-//			System.out.println("dupl"+" | random: "+random+" | pDupl: "+pDupl+"\t");
-//			return "dupl";
-//		}
-//		if (random < pCorr) {
-//			System.out.println("corr"+" | random: "+random+" | pCorr: "+pCorr+"\t");
-//			corrupt(packet);
-//			return "send";
-//		}
-//		if (random < pOrder) {
-//			System.out.println("reord"+" | random: "+random+" | pOrder: "+pOrder+"\t");
-//			return "reorder";
-//		}
+		if (random < pDrop) {
+			System.out.println("drop"+" | random: "+random+" | pDrop: "+pDrop+"\t");
+			return "drop";
+		}
+		if (random < pDupl) {
+			System.out.println("dupl"+" | random: "+random+" | pDupl: "+pDupl+"\t");
+			return "dupl";
+		}
+		if (random < pCorr) {
+			System.out.println("corr"+" | random: "+random+" | pCorr: "+pCorr+"\t");
+			corrupt(packet);
+			return "corr";
+		}
+		if (random < pOrder) {
+			System.out.println("reord"+" | random: "+random+" | pOrder: "+pOrder+"\t");
+			return "reorder";
+		}
 		if (random < pDelay) {
 			System.out.println("delay"+" | random: "+random+" | pDelay: "+pDelay+"\t");
 			return "delay";
