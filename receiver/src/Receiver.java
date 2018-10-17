@@ -66,6 +66,10 @@ public class Receiver {
 			incomingPacket = new DatagramPacket(incomingPayload, 5000);
 			socket.receive(incomingPacket);	
 			recvObj = STP.deserialize(incomingPayload);
+
+//			break loop if the receoved object contains fin flag, i.e. connection tear down
+			if (((STP)recvObj).isFinFlag()) break;
+			
 			recvSeqNum = ((STP)recvObj).getSeqNum();
 			recvAckNum = ((STP)recvObj).getAckNum();
 			recvBuffArray = ((STP)recvObj).getData();
@@ -73,14 +77,12 @@ public class Receiver {
 			checksum = ((STP)recvObj).getChecksum();
 			System.out.print("recvSeqNum: "+recvSeqNum+"  \t recvAckNum: "+recvAckNum+"\t");
 						
-			if (((STP)recvObj).isFinFlag()) break;
 			generatedChecksum = genChecksum(recvBuffArray);
 			
 			
 //			checksum mismatch, duplicated packet
-			if (checksum != generatedChecksum) {
+			if (checksum != generatedChecksum) 
 				System.out.println("packed corrupted");
-			}
 			
 			
 			else if (expcSeq != recvSeqNum) {

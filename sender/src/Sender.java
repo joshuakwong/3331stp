@@ -96,12 +96,11 @@ public class Sender {
 //		int recvSeqNum = -1;
 //		int recvAckNum = -1;
 		
-		
-		
 		Listener listener = new Listener(socket);
 		Thread listenerThread = new Thread(listener);
 		listenerThread.start();
-			
+		
+		
 		
 		PLD pldModule = new PLD(pDrop, pDupl, pCorr, pOrder, pDelay, seed);
 		
@@ -143,15 +142,14 @@ public class Sender {
 				reorderExpPos = -1;
 				reorderedPacket = null;
 			}
-			
 		}
 		
 
+		int last = 0;
 		while (checkWindow() == true) {
 			System.out.print("----------mss reached----------\r");
-			int last = 0;
 			if ((last = checkTimeout()) != -1) {
-				System.out.println("timeout++++++++++++++++++++++++++++, now send: "+ last);
+				System.out.println("\ntimeout++++++++++++++++++++++++++++, now send: "+ last);
 				for (int y=0; y < (mws/mss); y++) {
 					if ((y+last) == (reorderExpPos-maxOrder)) {
 						reorderExpPos = -1;
@@ -161,8 +159,30 @@ public class Sender {
 				}
 			}
 			try {
-				Thread.sleep(100);
+				Thread.sleep(1);
 			}catch (Exception e) {}
+		}
+		
+		
+		while ((firstUnacked()) != -1) {
+			System.out.print("----------exists unacked packets----------\r");
+//			System.out.println("last: "+last);
+			while ((last = checkTimeout()) != -1) {
+				if (last != -1) {
+				System.out.println("\ntimeout++++++++++++++++++++++++++++, now send: "+ last);
+//				for (int y=0; y < (mws/mss); y++) {
+				if ((last) == (reorderExpPos-maxOrder)) {
+					reorderExpPos = -1;
+					reorderedPacket = null;
+				}
+				sendAction(last, pldModule);
+//				}
+			}
+			try {
+				Thread.sleep(1);
+			}catch (Exception e) {}
+			}
+			
 		}
 		
 		
@@ -173,6 +193,7 @@ public class Sender {
 //		keep staying in the loop until listenerThread is killed
 //		listenerThread kill only if all ack-backs have been received
 		while (listenerThread.isAlive()) {
+//			System.out.println("something not received yet, not killing listener");
 			try {
 				Thread.sleep(1);
 			} catch (Exception e) {}
@@ -273,6 +294,8 @@ public class Sender {
 		long currTime = System.currentTimeMillis();
 		int firstUnackedPackage = firstUnacked();
 		long timeoutInterval = 500 + (gamma*250);
+		
+		if (firstUnackedPackage == -1) return -1;
 		
 		if (segments[firstUnackedPackage].getStartTime()+timeoutInterval < currTime) 
 			return firstUnackedPackage;
