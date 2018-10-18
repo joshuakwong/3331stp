@@ -7,6 +7,7 @@ public class FilePacket {
 	private boolean sentFlag;
 	private boolean ackedFlag;
 	private int expAck;
+	private int ackCount;
 	private long startTime;
 	
 	FilePacket(byte[] data, int startNum, int endNum) {
@@ -16,6 +17,7 @@ public class FilePacket {
 		this.sentFlag = false;
 		this.ackedFlag = false;
 		this.expAck = -1;
+		this.ackCount = 0;
 		this.setStartTime(0);
 	}
 
@@ -73,6 +75,14 @@ public class FilePacket {
 
 	public void setStartTime(long startTime) {
 		this.startTime = startTime;
+	}
+
+	public int getAckCount() {
+		return ackCount;
+	}
+
+	public void setAckCount(int ackCount) {
+		this.ackCount = ackCount;
 	}
 
 }

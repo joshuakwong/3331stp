@@ -2,14 +2,16 @@ import java.util.Random;
 
 public class PLD {
 	
-	private static double pDrop = 0;
-	private static double pDupl = 0;
-	private static double pCorr= 0;
-	private static double pOrder = 0;
-	private static double pDelay = 0;
-	private static Random rand = null;
-	private static float random = 0;
+	private double pDrop = 0;
+	private double pDupl = 0;
+	private double pCorr= 0;
+	private double pOrder = 0;
+	private double pDelay = 0;
+	private Random rand = null;
+	private float random = 0;
 	
+	
+
 	PLD (double pDrop, double pDupl, double pCorr, double pOrder, double pDelay, int seed){
 		this.pDrop = pDrop;
 		this.pDupl = pDupl;
@@ -26,27 +28,21 @@ public class PLD {
 //		random = 1; System.out.println();
 		
 		if (random < pDrop) {
-//			System.out.println("drop"+" | random: "+random+" | pDrop: "+pDrop+"\t");
 			return "drop";
 		}
 		if (random < pDupl) {
-//			System.out.println("dupl"+" | random: "+random+" | pDupl: "+pDupl+"\t");
 			return "dupl";
 		}
 		if (random < pCorr) {
-//			System.out.println("corr"+" | random: "+random+" | pCorr: "+pCorr+"\t");
 			corrupt(packet);
 			return "corr";
 		}
 		if (random < pOrder) {
-//			System.out.println("reord"+" | random: "+random+" | pOrder: "+pOrder+"\t");
 			return "reorder";
 		}
 		if (random < pDelay) {
-//			System.out.println("delay"+" | random: "+random+" | pDelay: "+pDelay+"\t");
 			return "delay";
 		}
-//		System.out.println("send"+" | random: "+random+" | No action ");
 		return "send";
 	}
 	
@@ -62,45 +58,61 @@ public class PLD {
 	}
 
 
-	public static double getpDrop() {
+	public double getpDrop() {
 		return pDrop;
 	}
 
-	public static void setpDrop(double pDrop) {
-		PLD.pDrop = pDrop;
+	public void setpDrop(double pDrop) {
+		this.pDrop = pDrop;
 	}
 
-	public static double getpDupl() {
+	public double getpDupl() {
 		return pDupl;
 	}
 
-	public static void setpDupl(double pDupl) {
-		PLD.pDupl = pDupl;
+	public void setpDupl(double pDupl) {
+		this.pDupl = pDupl;
 	}
 
-	public static double getpCorr() {
+	public double getpCorr() {
 		return pCorr;
 	}
 
-	public static void setpCorr(double pCorr) {
-		PLD.pCorr = pCorr;
+	public void setpCorr(double pCorr) {
+		this.pCorr = pCorr;
 	}
 
-	public static double getpOrder() {
+	public double getpOrder() {
 		return pOrder;
 	}
 
-	public static void setpOrder(double pOrder) {
-		PLD.pOrder = pOrder;
+	public void setpOrder(double pOrder) {
+		this.pOrder = pOrder;
 	}
 
-	public static float getRandom() {
+	public double getpDelay() {
+		return pDelay;
+	}
+
+	public void setpDelay(double pDelay) {
+		this.pDelay = pDelay;
+	}
+
+	public Random getRand() {
+		return rand;
+	}
+
+	public void setRand(Random rand) {
+		this.rand = rand;
+	}
+
+	public float getRandom() {
 		return random;
 	}
 
-	public static void setRandom(float random) {
-		PLD.random = random;
+	public void setRandom(float random) {
+		this.random = random;
 	}
-	
+
 	
 }

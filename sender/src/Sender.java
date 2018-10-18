@@ -12,13 +12,6 @@ import java.util.Random;
 
 public class Sender {
 	
-	private static final int MAXSIZE = 1024;
-	public static DatagramSocket socket = null;
-	public static FilePacket[] segments = null;
-	public static int currSeq = 0;
-	public static int currAck = 0;
-	
-	
 	public static DatagramPacket reorderedPacket = null;
 	public static int reorderExpPos = -1;
 	
@@ -37,6 +30,14 @@ public class Sender {
 	private static int maxDelay = 0;
 	private static int seed = 0;
 	
+	private static final int MAXSIZE = 1024;
+	public static DatagramSocket socket = null;
+	public static FilePacket[] segments = null;
+	public static FilePacket firstSegment = null;
+	public static int currSeq = 0;
+	public static int currAck = 0;
+	
+
 	public static void main (String[] args) throws Exception{
 		if (args.length != 14) {
 			System.out.println("Error: Usage:");
@@ -109,6 +110,7 @@ public class Sender {
 //			checking for mss
 //			if reached, trap in loop and sleep
 			while (checkWindow() == true) {
+	
 				System.out.print("----------mss reached----------\r");
 				int last = 0;
 				if ((last = checkTimeout()) != -1) {
@@ -128,17 +130,18 @@ public class Sender {
 			
 			sendAction(i, pldModule);
 			
+			
 //			check for staged packets.
 //			if there are any, check and see if it is time to send
 //			reset 2 variables afterwards
+//			send the staged packet first
+//			reset reordering variables
 			if (reorderExpPos == i) {
-//				send the staged packet first
 				int originalPos = reorderExpPos-maxOrder;
 				if (segments[originalPos].isAckedFlag() == false) {
 					System.out.println("sending reordered packet>>>>>>>>>>>>>>>>>>>>");
 					socket.send(reorderedPacket);
 				}
-//				reset reordering variables
 				reorderExpPos = -1;
 				reorderedPacket = null;
 			}
@@ -327,6 +330,7 @@ public class Sender {
 	
 	
 	private static FilePacket[] to2D(byte[] buffer) {
+		firstSegment = new FilePacket(null, 0, 0);
 		int len = 0;
 		if (buffer.length%mss == 0) len = buffer.length/mss;
 		else len = buffer.length/mss +1;

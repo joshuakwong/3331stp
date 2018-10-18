@@ -4,12 +4,12 @@ import java.net.DatagramSocket;
 
 public class Listener implements Runnable{
 
-	private static final int MAXSIZE = 1024;
-	private static DatagramSocket socket = null;
-	private static DatagramPacket incomingPacket = null;
-	private static byte[] incomingPayload = new byte[5000];
-	private static Object recvObj = null;
-	private static boolean exit = false;
+	private final int MAXSIZE = 1024;
+	private DatagramSocket socket = null;
+	private DatagramPacket incomingPacket = null;
+	private byte[] incomingPayload = new byte[5000];
+	private Object recvObj = null;
+	private boolean exit = false;
 	
 	Listener(DatagramSocket socket){
 		this.socket = socket;
@@ -31,14 +31,40 @@ public class Listener implements Runnable{
 				recvSeqNum = ((STP) recvObj).getSeqNum();
 				recvAckNum = ((STP) recvObj).getAckNum();
 				
-//				special case for first packet
-				for (int i=0; i<Sender.segments.length; i++) {
-					if (recvAckNum == Sender.segments[i].getExpAck()) 
-						Sender.segments[i].setAckedFlag(true);
+				int recvSeg = findSeg(recvAckNum);
+				int firstUnackSeg = firstUnack();
+				
+				if (recvSeg == -1) {
+					int old = Sender.firstSegment.getAckCount();
+					Sender.firstSegment.setAckCount(old+1);
 				}
-
+//				normal mode
+				else if (recvSeg == firstUnackSeg) {
+					Sender.segments[recvSeg].setAckedFlag(true);
+					Sender.segments[recvSeg].setAckCount(1);
+				}
+				
+//				resend same ack to already acked packets
+				else if (recvSeg < firstUnackSeg) {
+					int old = Sender.segments[recvSeg].getAckCount();
+					Sender.segments[recvSeg].setAckCount(old+1);
+				}
+				
+				else if (recvSeg > firstUnackSeg) {
+					for (int i=firstUnackSeg; i<=recvSeg; i++) {
+						Sender.segments[i].setAckedFlag(true);
+						Sender.segments[i].setAckCount(1);
+					}
+				}
 				exit = checkAllAck();
-				System.out.print("\nListener: received ack " + recvAckNum);
+				
+				System.out.println("\nListener: received ack " + recvAckNum+"\t recvSeg: "+recvSeg+"\t firstUnacked: "+firstUnackSeg);
+//				System.out.println("All ack flag state");
+//				for (FilePacket item : Sender.segments) {
+//					System.out.print(item.isAckedFlag()+"_");
+//				}
+//				System.out.println();
+				
 			} catch (IOException | ClassNotFoundException e) {
 				e.printStackTrace();
 			}
@@ -48,17 +74,31 @@ public class Listener implements Runnable{
 		Sender.currSeq = recvAckNum;
 		System.out.println("\n-----------------ending listener-----------------");
 	}
+	
+	public int findSeg(int recvAck) {
+		for (int i=0; i<Sender.segments.length; i++) 
+			if (Sender.segments[i].getExpAck() == recvAck) return i;
+		
+		return -1;
+	}
+	
+	public int firstUnack() {
+		for (int i=0; i<Sender.segments.length; i++) 
+			if (Sender.segments[i].isAckedFlag() == false) return i;
+		
+		return -1;
+	}
+	
 
-	public static boolean checkAllAck() {
-		int i=0;
-		for (i=0; i<Sender.segments.length; i++) 
+	public boolean checkAllAck() {
+		for (int i=0; i<Sender.segments.length; i++) 
 			if (Sender.segments[i].isAckedFlag() == false) return false;
 		
 		return true;
 	}
 	
-	public static void setExit(boolean exit) {
-		Listener.exit = exit;
+	public void setExit(boolean exit) {
+		this.exit = exit;
 	}
 	
 }
