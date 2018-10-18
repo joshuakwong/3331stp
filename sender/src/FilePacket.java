@@ -17,7 +17,7 @@ public class FilePacket {
 		this.sentFlag = false;
 		this.ackedFlag = false;
 		this.expAck = -1;
-		this.ackCount = 0;
+		this.ackCount = -1;
 		this.setStartTime(0);
 	}
 

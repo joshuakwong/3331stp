@@ -38,27 +38,30 @@ public class Listener implements Runnable{
 					int old = Sender.firstSegment.getAckCount();
 					Sender.firstSegment.setAckCount(old+1);
 				}
-//				normal mode
+
+//				first ack received for a segment
 				else if (recvSeg == firstUnackSeg) {
 					Sender.segments[recvSeg].setAckedFlag(true);
-					Sender.segments[recvSeg].setAckCount(1);
+					Sender.segments[recvSeg].setAckCount(0);
 				}
 				
-//				resend same ack to already acked packets
+//				receiving same ack for a segment 
 				else if (recvSeg < firstUnackSeg) {
 					int old = Sender.segments[recvSeg].getAckCount();
 					Sender.segments[recvSeg].setAckCount(old+1);
 				}
 				
+//				ack assumption
 				else if (recvSeg > firstUnackSeg) {
 					for (int i=firstUnackSeg; i<=recvSeg; i++) {
 						Sender.segments[i].setAckedFlag(true);
-						Sender.segments[i].setAckCount(1);
+						Sender.segments[i].setAckCount(0);
 					}
 				}
 				exit = checkAllAck();
 				
-				System.out.println("\nListener: received ack " + recvAckNum+"\t recvSeg: "+recvSeg+"\t firstUnacked: "+firstUnackSeg);
+				System.out.println("\nListener: received ack " + recvAckNum+"   recvSeg: "+recvSeg
+						+"   firstUnacked: "+firstUnack());
 //				System.out.println("All ack flag state");
 //				for (FilePacket item : Sender.segments) {
 //					System.out.print(item.isAckedFlag()+"_");

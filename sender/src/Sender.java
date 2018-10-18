@@ -36,6 +36,7 @@ public class Sender {
 	public static FilePacket firstSegment = null;
 	public static int currSeq = 0;
 	public static int currAck = 0;
+	public static PLD pldModule = null;
 	
 
 	public static void main (String[] args) throws Exception{
@@ -103,7 +104,37 @@ public class Sender {
 		
 		
 		
-		PLD pldModule = new PLD(pDrop, pDupl, pCorr, pOrder, pDelay, seed);
+		pldModule = new PLD(pDrop, pDupl, pCorr, pOrder, pDelay, seed);
+		
+		Thread fastRetrans = new Thread(new Runnable(){
+			
+			@Override
+			public void run() {
+				while (true) {
+					if (Sender.firstSegment.getAckCount() >= 2) {
+						Sender.firstSegment.setAckCount(-1);
+//						System.out.println("Sending pkt 0 via fast retransmit");
+						try {
+							Sender.sendAction(0, pldModule);
+						} catch (IOException e) {}
+					}
+					int i=0;
+					for (i=0; i<Sender.segments.length; i++) {
+						if (Sender.segments[i].getAckCount() >= 2) {
+							Sender.segments[i].setAckCount(-1);
+//							System.out.println("Sending pkt "+(i+1)+" via fast retransmit");
+							try {
+								Sender.sendAction(i+1, pldModule);
+							} catch (IOException e) {}
+						}
+					}					
+				}
+			}
+		});
+		
+		fastRetrans.start();
+		
+		
 		
 		for (int i=0; i<segments.length; i++) {
 			
@@ -114,7 +145,7 @@ public class Sender {
 				System.out.print("----------mss reached----------\r");
 				int last = 0;
 				if ((last = checkTimeout()) != -1) {
-					System.out.println("timeout++++++++++++++++++++++++++++, now send: "+ last);
+					System.out.println("\ntimeout now send: "+ last);
 					for (int y=0; y < (mws/mss); y++) {
 						if ((y+last) == (reorderExpPos-maxOrder)) {
 							reorderExpPos = -1;
@@ -127,6 +158,7 @@ public class Sender {
 					Thread.sleep(1);
 				}catch (Exception e) {}
 			}
+			System.out.println();
 			
 			sendAction(i, pldModule);
 			
@@ -139,7 +171,7 @@ public class Sender {
 			if (reorderExpPos == i) {
 				int originalPos = reorderExpPos-maxOrder;
 				if (segments[originalPos].isAckedFlag() == false) {
-					System.out.println("sending reordered packet>>>>>>>>>>>>>>>>>>>>");
+//					System.out.println("sending reordered packet>>>>>>>>>>>>>>>>>>>>");
 					socket.send(reorderedPacket);
 				}
 				reorderExpPos = -1;
@@ -152,7 +184,7 @@ public class Sender {
 		while (checkWindow() == true) {
 			System.out.print("----------mss reached----------\r");
 			if ((last = checkTimeout()) != -1) {
-				System.out.println("\ntimeout++++++++++++++++++++++++++++, now send: "+ last);
+//				System.out.println("\ntimeout++++++++++++++++++++++++++++, now send: "+ last);
 				for (int y=0; y < (mws/mss); y++) {
 					if ((y+last) == (reorderExpPos-maxOrder)) {
 						reorderExpPos = -1;
@@ -172,14 +204,12 @@ public class Sender {
 //			System.out.println("last: "+last);
 			while ((last = checkTimeout()) != -1) {
 				if (last != -1) {
-				System.out.println("\ntimeout++++++++++++++++++++++++++++, now send: "+ last);
-//				for (int y=0; y < (mws/mss); y++) {
+//				System.out.println("\ntimeout++++++++++++++++++++++++++++, now send: "+ last);
 				if ((last) == (reorderExpPos-maxOrder)) {
 					reorderExpPos = -1;
 					reorderedPacket = null;
 				}
 				sendAction(last, pldModule);
-//				}
 			}
 			try {
 				Thread.sleep(1);
@@ -201,6 +231,7 @@ public class Sender {
 				Thread.sleep(1);
 			} catch (Exception e) {}
 		}
+		
 		System.out.println("-----------------ending sendFile-----------------");
 	}
 
@@ -245,7 +276,7 @@ public class Sender {
 						int sleep = new Random().nextInt(maxDelay)+1;
 						Thread.sleep(sleep);
 						Sender.socket.send(outgoingPacket);
-						System.out.println("delayed packet "+position+" sent________________________________");
+//						System.out.println("delayed packet "+position+" sent________________________________");
 					} catch (InterruptedException | IOException e) {
 						e.printStackTrace();
 					}

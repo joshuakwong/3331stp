@@ -179,12 +179,7 @@ public class Receiver {
 
 	private static void pushToList(List<RecvSegment> list, RecvSegment seg) {
 		list.add(seg);
-		
 		Collections.sort(list);
-//		System.out.println("Sorted result");
-//		for (RecvSegment item : list) 
-//			System.out.print(item.getRecvSeq()+"_");
-//		System.out.println();
 		
 		return;
 	}
