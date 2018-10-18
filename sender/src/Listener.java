@@ -62,11 +62,6 @@ public class Listener implements Runnable{
 				
 				System.out.println("\nListener: received ack " + recvAckNum+"   recvSeg: "+recvSeg
 						+"   firstUnacked: "+firstUnack());
-//				System.out.println("All ack flag state");
-//				for (FilePacket item : Sender.segments) {
-//					System.out.print(item.isAckedFlag()+"_");
-//				}
-//				System.out.println();
 				
 			} catch (IOException | ClassNotFoundException e) {
 				e.printStackTrace();

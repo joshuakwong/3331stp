@@ -6,8 +6,10 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.zip.Adler32;
 import java.util.zip.CRC32;
 
 public class Receiver {
@@ -31,8 +33,8 @@ public class Receiver {
 		file = args[1];
 		socket = new DatagramSocket(recvPort);
 		
-		int currSeq = 0;
-		int currAck = 0;
+//		int currSeq = 0;
+//		int currAck = 0;
 
 		initConn();
 		Object tmp = recvPacket();
@@ -160,11 +162,11 @@ public class Receiver {
 
 //		generate pdf with buffer
 		
-//		byte[] pdfData = toArray(fileDataArrayList);
-//		OutputStream out = new FileOutputStream(new File(file));
-//		out.write(pdfData);
-//		System.out.println("pdf created");
-//		out.close();
+		byte[] pdfData = toArray(masterBufferList);
+		OutputStream out = new FileOutputStream(new File(file));
+		out.write(pdfData);
+		System.out.println("pdf created");
+		out.close();
 		
 		return recvObj;
 		
@@ -195,44 +197,47 @@ public class Receiver {
 			System.out.println("there is a problem, pushing has a problem");
 			return false;
 		}
-//		else if (listInOrder(secondary, mss) == false) return false;
 		
 		else if(firstSeqFromSec-lastSeqFromMaster == mss) return true;
 		
 		else return false;
 	}
 	
-	private static boolean listInOrder (List<RecvSegment> secondary, int mss) {
-		if (secondary.size() ==1) return true;
-		for (int i=0; i<secondary.size()-1; i++) {
-			int first = secondary.get(i).getRecvSeq();
-			int second = secondary.get(i+1).getRecvSeq();
-			if ((second-first) != mss) return false;
-		}
-		
-		return true;
-	}
 	
 	private static void mergeList(List<RecvSegment> master, List<RecvSegment> secondary) {
 		System.out.println("list merge");
 		master.add(secondary.remove(0));
-//		for (RecvSegment seg : secondary) 
-//			master.add(seg);
-//		secondary.clear();
+		
+		return;
 	}
 
-	private static byte[] toArray(List<Byte> list){
-		Object[] tmp = list.toArray();
-		byte[] data = new byte[tmp.length];
+	private static byte[] toArray(List<RecvSegment> list){
+//		List buff = new ArrayList();
+		int size = 0;
+		for (RecvSegment item : list) {
+			size += item.getLength();
+		}
 		
+//		System.out.println("size: "+size);
+		byte[] giantBuffer = new byte[size];
 		int i=0;
-		for (Object b : tmp) data[i++] = ((Byte) b).byteValue();
-		return data;
+		while (i<size) {
+			for(RecvSegment item : list) {
+				for (int y=0; y<item.getData().length; y++) {
+					byte[] smallBuff = item.getData();
+					giantBuffer[i] = smallBuff[y];
+					i++;
+				}				
+			}
+		}
+		
+		return giantBuffer;
 	}
 
 	private static long genChecksum(byte[] data) {
 		long res = 0;
-		CRC32 checksum = new CRC32();
+//		CRC32 checksum = new CRC32();
+		Adler32 checksum = new Adler32();
 		checksum.update(data);
 		res = checksum.getValue();
 		
@@ -286,7 +291,6 @@ public class Receiver {
 		int outAckNum = currAck;
 		int recvSeqNum = -1;
 		int recvAckNum = -1;
-		int end = 0;
 		
 //		receive fin packet
 		recvObj = fromPrev;

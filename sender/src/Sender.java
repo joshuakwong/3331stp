@@ -110,10 +110,9 @@ public class Sender {
 			
 			@Override
 			public void run() {
-				while (true) {
+				while (checkAllAck() == true) {
 					if (Sender.firstSegment.getAckCount() >= 2) {
 						Sender.firstSegment.setAckCount(-1);
-//						System.out.println("Sending pkt 0 via fast retransmit");
 						try {
 							Sender.sendAction(0, pldModule);
 						} catch (IOException e) {}
@@ -122,13 +121,20 @@ public class Sender {
 					for (i=0; i<Sender.segments.length; i++) {
 						if (Sender.segments[i].getAckCount() >= 2) {
 							Sender.segments[i].setAckCount(-1);
-//							System.out.println("Sending pkt "+(i+1)+" via fast retransmit");
 							try {
 								Sender.sendAction(i+1, pldModule);
 							} catch (IOException e) {}
 						}
-					}					
+					}
 				}
+			}
+			
+			
+			public boolean checkAllAck() {
+				for (int i=0; i<Sender.segments.length; i++) 
+					if (Sender.segments[i].isAckedFlag() == false) return false;
+				
+				return true;
 			}
 		});
 		
@@ -171,7 +177,6 @@ public class Sender {
 			if (reorderExpPos == i) {
 				int originalPos = reorderExpPos-maxOrder;
 				if (segments[originalPos].isAckedFlag() == false) {
-//					System.out.println("sending reordered packet>>>>>>>>>>>>>>>>>>>>");
 					socket.send(reorderedPacket);
 				}
 				reorderExpPos = -1;
@@ -184,7 +189,6 @@ public class Sender {
 		while (checkWindow() == true) {
 			System.out.print("----------mss reached----------\r");
 			if ((last = checkTimeout()) != -1) {
-//				System.out.println("\ntimeout++++++++++++++++++++++++++++, now send: "+ last);
 				for (int y=0; y < (mws/mss); y++) {
 					if ((y+last) == (reorderExpPos-maxOrder)) {
 						reorderExpPos = -1;
@@ -204,34 +208,27 @@ public class Sender {
 //			System.out.println("last: "+last);
 			while ((last = checkTimeout()) != -1) {
 				if (last != -1) {
-//				System.out.println("\ntimeout++++++++++++++++++++++++++++, now send: "+ last);
-				if ((last) == (reorderExpPos-maxOrder)) {
-					reorderExpPos = -1;
-					reorderedPacket = null;
+					if ((last) == (reorderExpPos-maxOrder)) {
+						reorderExpPos = -1;
+						reorderedPacket = null;
+					}
+					sendAction(last, pldModule);
 				}
-				sendAction(last, pldModule);
+				try {
+					Thread.sleep(1);
+				}catch (Exception e) {}
 			}
-			try {
-				Thread.sleep(1);
-			}catch (Exception e) {}
-			}
-			
 		}
-		
-		
-		
-		currSeq = outSeqNum;
-		currAck = outAckNum;
 		
 //		keep staying in the loop until listenerThread is killed
 //		listenerThread kill only if all ack-backs have been received
 		while (listenerThread.isAlive()) {
-//			System.out.println("something not received yet, not killing listener");
 			try {
 				Thread.sleep(1);
 			} catch (Exception e) {}
 		}
 		
+		System.out.println("currAck = "+currAck+"  currSeq = "+currSeq);
 		System.out.println("-----------------ending sendFile-----------------");
 	}
 
@@ -241,7 +238,6 @@ public class Sender {
 		int outSeqNum;
 		DatagramPacket outgoingPacket = null;
 		byte[] outgoingPayload = null;
-
 		
 		outSeqNum = calcSeqNum(segCount);
 		
@@ -302,7 +298,7 @@ public class Sender {
 			
 //			if there are staged packet already, send the packet right away
 			if (reorderedPacket != null) {
-				System.out.println("exists reordering packet previously: "+(reorderExpPos-maxOrder));
+//				System.out.println("exists reordering packet previously: "+(reorderExpPos-maxOrder));
 				socket.send(outgoingPacket);
 				return;
 			}
@@ -313,7 +309,7 @@ public class Sender {
 				reorderExpPos = position+(mws/mss);
 				reorderedPacket = outgoingPacket;
 				
-				System.out.println("hit order: reorderExpectedPosition: "+reorderExpPos);
+//				System.out.println("hit order: reorderExpectedPosition: "+reorderExpPos);
 			}	
 		}
 		
