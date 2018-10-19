@@ -23,7 +23,6 @@ public class Listener implements Runnable{
 		int recvSeqNum = 0;
 		int recvAckNum = 0;
 		while (exit == false) {
-//			boolean flag = false;
 			try {
 				incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 				socket.receive(incomingPacket);
@@ -35,24 +34,37 @@ public class Listener implements Runnable{
 				int firstUnackSeg = firstUnack();
 				
 				if (recvSeg == -1) {
-					int old = Sender.firstSegment.getAckCount();
-					Sender.firstSegment.setAckCount(old+1);
+					System.out.println("first seg:"+Sender.firstSegment.isAckedFlag());
+					if (Sender.firstSegment.isAckedFlag() == false) {
+						Sender.logger("rcv", "A",  recvSeqNum, 0, recvAckNum);
+						Sender.firstSegment.setAckedFlag(true);
+						Sender.firstSegment.setAckCount(0);
+					}
+					
+					else {
+						Sender.logger("rcv/DA", "A",  recvSeqNum, 0, recvAckNum);
+						int old = Sender.firstSegment.getAckCount();
+						Sender.firstSegment.setAckCount(old+1);
+					}
 				}
 
 //				first ack received for a segment
 				else if (recvSeg == firstUnackSeg) {
+					Sender.logger("rcv", "A",  recvSeqNum, 0, recvAckNum);
 					Sender.segments[recvSeg].setAckedFlag(true);
 					Sender.segments[recvSeg].setAckCount(0);
 				}
 				
 //				receiving same ack for a segment 
 				else if (recvSeg < firstUnackSeg) {
+					Sender.logger("rcv/DA", "A",  recvSeqNum, 0, recvAckNum);
 					int old = Sender.segments[recvSeg].getAckCount();
 					Sender.segments[recvSeg].setAckCount(old+1);
 				}
 				
 //				ack assumption
 				else if (recvSeg > firstUnackSeg) {
+					Sender.logger("rcv", "A",  recvSeqNum, 0, recvAckNum);
 					for (int i=firstUnackSeg; i<=recvSeg; i++) {
 						Sender.segments[i].setAckedFlag(true);
 						Sender.segments[i].setAckCount(0);

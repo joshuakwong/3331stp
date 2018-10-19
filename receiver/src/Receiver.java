@@ -81,13 +81,14 @@ public class Receiver {
 			checksum = ((STP)recvObj).getChecksum();
 			System.out.print("recvSeqNum: "+recvSeqNum+"\t");
 						
-			generatedChecksum = genChecksum(recvBuffArray);
+//			generatedChecksum = genChecksum(recvBuffArray);
+			generatedChecksum = ((STP)recvObj).genChecksum(recvBuffArray);
 			
 			RecvSegment seg = new RecvSegment(recvSeqNum, recvAckNum, recvBuffLength, recvBuffArray);
 			
 //			checksum mismatch, duplicated packet
 			if (checksum != generatedChecksum) 
-				System.out.println("packed corrupted");
+				System.out.println("packed corrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrupted");
 			
 			
 //			packets arrive in order
@@ -146,16 +147,16 @@ public class Receiver {
 				
 				
 			}
-			System.out.println();
-			System.out.println("master list");
-			for (RecvSegment item : masterBufferList) 
-				System.out.print(item.getRecvSeq()+"_");
-			System.out.println();
-			
-			System.out.println("secondary list");
-			for (RecvSegment item : secondaryBufferList) 
-				System.out.print(item.getRecvSeq()+"_");
-			System.out.println();
+//			System.out.println();
+//			System.out.println("master list");
+//			for (RecvSegment item : masterBufferList) 
+//				System.out.print(item.getRecvSeq()+"_");
+//			System.out.println();
+//			
+//			System.out.println("secondary list");
+//			for (RecvSegment item : secondaryBufferList) 
+//				System.out.print(item.getRecvSeq()+"_");
+//			System.out.println();
 			
 			System.out.println("-------------------------------------------------");
 		}
@@ -205,9 +206,7 @@ public class Receiver {
 	
 	
 	private static void mergeList(List<RecvSegment> master, List<RecvSegment> secondary) {
-		System.out.println("list merge");
 		master.add(secondary.remove(0));
-		
 		return;
 	}
 
@@ -232,16 +231,6 @@ public class Receiver {
 		}
 		
 		return giantBuffer;
-	}
-
-	private static long genChecksum(byte[] data) {
-		long res = 0;
-//		CRC32 checksum = new CRC32();
-		Adler32 checksum = new Adler32();
-		checksum.update(data);
-		res = checksum.getValue();
-		
-		return res;
 	}
 	
 

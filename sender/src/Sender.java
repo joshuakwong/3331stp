@@ -1,7 +1,9 @@
+import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.DatagramPacket;
@@ -37,6 +39,7 @@ public class Sender {
 	public static int currSeq = 0;
 	public static int currAck = 0;
 	public static PLD pldModule = null;
+	public static long startTime = 0;
 	
 
 	public static void main (String[] args) throws Exception{
@@ -77,6 +80,8 @@ public class Sender {
         // through the port specified on the command line.
 		socket = new DatagramSocket();
 		
+		startTime = System.currentTimeMillis();
+		
 		buffObj = initConn();
 		byte[] buffer = pdfToArray(path);
 		segments = to2D(buffer);
@@ -84,9 +89,11 @@ public class Sender {
 		currAck = 1;
 		sendPacket(segments);
 		finnConn();
+		
 		return;
 	}
 
+	
 	
 	private static void sendPacket (FilePacket[] segments) throws IOException, ClassNotFoundException {
 		Object recvObj = null;
@@ -107,28 +114,26 @@ public class Sender {
 		pldModule = new PLD(pDrop, pDupl, pCorr, pOrder, pDelay, seed);
 		
 		Thread fastRetrans = new Thread(new Runnable(){
-			
 			@Override
 			public void run() {
 				while (checkAllAck() == true) {
 					if (Sender.firstSegment.getAckCount() >= 2) {
-						Sender.firstSegment.setAckCount(-1);
 						try {
-							Sender.sendAction(0, pldModule);
+							Sender.sendAction(0, pldModule, true, false);
 						} catch (IOException e) {}
+						Sender.firstSegment.setAckCount(-1);
 					}
 					int i=0;
 					for (i=0; i<Sender.segments.length; i++) {
 						if (Sender.segments[i].getAckCount() >= 2) {
-							Sender.segments[i].setAckCount(-1);
 							try {
-								Sender.sendAction(i+1, pldModule);
+								Sender.sendAction(i+1, pldModule, true, false);
 							} catch (IOException e) {}
+							Sender.segments[i].setAckCount(-1);
 						}
 					}
 				}
 			}
-			
 			
 			public boolean checkAllAck() {
 				for (int i=0; i<Sender.segments.length; i++) 
@@ -156,8 +161,11 @@ public class Sender {
 						if ((y+last) == (reorderExpPos-maxOrder)) {
 							reorderExpPos = -1;
 							reorderedPacket = null;
+							sendAction((y+last), pldModule, true, true);
 						}
-						sendAction((y+last), pldModule);
+						else {
+							sendAction((y+last), pldModule, true, false);
+						}
 					}
 				}
 				try {
@@ -166,14 +174,16 @@ public class Sender {
 			}
 			System.out.println();
 			
-			sendAction(i, pldModule);
+			sendAction(i, pldModule, false, false);
 			
 			
-//			check for staged packets.
-//			if there are any, check and see if it is time to send
-//			reset 2 variables afterwards
-//			send the staged packet first
-//			reset reordering variables
+/**
+ * 			check for staged packets.
+ * 			if there are any, check and see if it is time to send
+ * 			reset 2 variables afterwards
+ * 			send the staged packet first
+ * 			reset reordering variables
+ */
 			if (reorderExpPos == i) {
 				int originalPos = reorderExpPos-maxOrder;
 				if (segments[originalPos].isAckedFlag() == false) {
@@ -193,8 +203,10 @@ public class Sender {
 					if ((y+last) == (reorderExpPos-maxOrder)) {
 						reorderExpPos = -1;
 						reorderedPacket = null;
+						sendAction((y+last), pldModule, true, true);
 					}
-					sendAction((y+last), pldModule);
+					else 
+						sendAction((y+last), pldModule, true, false);
 				}
 			}
 			try {
@@ -211,8 +223,10 @@ public class Sender {
 					if ((last) == (reorderExpPos-maxOrder)) {
 						reorderExpPos = -1;
 						reorderedPacket = null;
+						sendAction(last, pldModule, true, true);
 					}
-					sendAction(last, pldModule);
+					else
+						sendAction(last, pldModule, true, false);
 				}
 				try {
 					Thread.sleep(1);
@@ -232,34 +246,70 @@ public class Sender {
 		System.out.println("-----------------ending sendFile-----------------");
 	}
 
-	private static void sendAction(int segCount, PLD pldModule) throws IOException{
+	private static void sendAction(int segCount, PLD pldModule, boolean rxt, boolean rord) throws IOException{
 		String inst = null;
 		STP stp = null;
 		int outSeqNum;
+		int outAckNum = 1;
+		int dataLength = 0;
 		DatagramPacket outgoingPacket = null;
 		byte[] outgoingPayload = null;
 		
 		outSeqNum = calcSeqNum(segCount);
+		outAckNum = 1;
 		
 		segments[segCount].setExpAck(outSeqNum+segments[segCount].getData().length);
 		segments[segCount].setSentFlag(true);
 		segments[segCount].setStartTime(System.currentTimeMillis());
 		
-		stp = new STP(false, false, false, outSeqNum, 1, segments[segCount].getData(), mss);
+		stp = new STP(false, false, false, outSeqNum, outAckNum, segments[segCount].getData(), mss);
+		dataLength = stp.getData().length;
 		inst = pldModule.action(stp);
 		outgoingPayload = stp.serialize();	
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
 		
 		System.out.println("Sender: sending segment   "+segCount+"  outSeqNum: "+outSeqNum+"\t expcSeqNum: "
 		+(outSeqNum+segments[segCount].getData().length)+"\t inst: "+ inst);
-		determinePLD(inst, outgoingPacket, segCount);
+		determinePLD(inst, outgoingPacket, segCount, outSeqNum, outAckNum, dataLength, rxt, rord);
 		
 	}
 	
-	
-	private static void determinePLD(String inst, DatagramPacket outgoingPacket, int position) throws IOException {
+
+	public static void logger(String event, String type, int seqNum, int length, int ackNum) throws IOException {
+		BufferedWriter out = null;
+		String toWrite = null;
+		double time = (double)(System.currentTimeMillis()-startTime)/1000;
+		if (event == "rcv" || event == "snd") 
+			toWrite = event+"     \t\t\t"+time+"\t\t"+type+"\t\t"+seqNum+"\t\t"+length+"\t\t"+ackNum+"\n";
+		else
+			toWrite = event+"     \t\t\t"+time+"\t\t"+type+"\t\t"+seqNum+"\t\t"+length+"\t\t"+ackNum+"\n";
+//		System.out.println(toWrite);
 		
-		if (inst == "send" || inst == "corr") {
+		try {
+			FileWriter fStream = new FileWriter("Sender_log.txt", true);
+			out = new BufferedWriter(fStream);
+			out.write(toWrite);
+		}catch (IOException e) {}
+		finally {
+			if (out != null) out.close();
+		}
+	}
+	
+	
+	private static void determinePLD(String inst, DatagramPacket outgoingPacket, int position, int seqNum, int ackNum, int length, boolean rxt, boolean rord) throws IOException {
+		
+		
+		if (inst == "send") {
+			if (rxt == false) logger("snd", "D", seqNum, length, ackNum);
+			else logger("snd/RXT", "D", seqNum, length, ackNum);
+			socket.send(outgoingPacket);
+			return;
+		}
+		
+		if (inst == "corr") {
+//			if (rxt == false) 
+			logger("snd/corr", "D", seqNum, length, ackNum);
+//			else logger("snd/RXT/corr", "D", seqNum, length, ackNum);
 			socket.send(outgoingPacket);
 			return;
 		}
@@ -271,8 +321,10 @@ public class Sender {
 					try {
 						int sleep = new Random().nextInt(maxDelay)+1;
 						Thread.sleep(sleep);
+//						if (rxt == false) 
+						logger("snd/delay", "D", seqNum, length, ackNum);
+//						else logger("snd/RXT/delay", "D", seqNum, length, ackNum);
 						Sender.socket.send(outgoingPacket);
-//						System.out.println("delayed packet "+position+" sent________________________________");
 					} catch (InterruptedException | IOException e) {
 						e.printStackTrace();
 					}
@@ -283,11 +335,20 @@ public class Sender {
 		}
 		
 		if (inst == "drop") {
+//			if (rxt == false) 
+			logger("drop", "D", seqNum, length, ackNum);
+//			else logger("RXT/drop", "D", seqNum, length, ackNum);
 			return;
 		}
 		
 		if (inst == "dupl") {
+//			if (rxt == false) 
+			logger("snd", "D", seqNum, length, ackNum);
+//			else logger("snd/RXT", "D", seqNum, length, ackNum);
 			socket.send(outgoingPacket);
+//			if (rxt == false) 
+			logger("snd/dupl", "D", seqNum, length, ackNum);
+//			else logger("snd/RXT/dupl", "D", seqNum, length, ackNum);
 			socket.send(outgoingPacket);
 			return;
 		}
@@ -299,6 +360,8 @@ public class Sender {
 //			if there are staged packet already, send the packet right away
 			if (reorderedPacket != null) {
 //				System.out.println("exists reordering packet previously: "+(reorderExpPos-maxOrder));
+				if (rxt == false) logger("snd", "D", seqNum, length, ackNum);
+				else logger("snd/RXT", "D", seqNum, length, ackNum);
 				socket.send(outgoingPacket);
 				return;
 			}
@@ -308,8 +371,6 @@ public class Sender {
 //				else reorderExpPos = segments.length;
 				reorderExpPos = position+(mws/mss);
 				reorderedPacket = outgoingPacket;
-				
-//				System.out.println("hit order: reorderExpectedPosition: "+reorderExpPos);
 			}	
 		}
 		
@@ -355,7 +416,6 @@ public class Sender {
 
 	}
 	
-	
 	private static FilePacket[] to2D(byte[] buffer) {
 		firstSegment = new FilePacket(null, 0, 0);
 		int len = 0;
@@ -387,30 +447,44 @@ public class Sender {
 		DatagramPacket outgoingPacket = null;
 		byte[] incomingPayload = new byte[MAXSIZE];
 		byte[] outgoingPayload = null;
+		int outSeq = 0;
+		int outAck = 0;
+		int dataLength = 0;
+		int recvSeq = 0;
+		int recvAck = 0;
 		
 //		send syn packet
-		stp = new STP(true, false, false, 0, 0, mss);
+		stp = new STP(true, false, false, outSeq, outAck, mss);
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
+		if (stp.getData() == null) dataLength = 0;
+		logger("snd", "S", outSeq, dataLength, outAck);
 		socket.send(outgoingPacket);
-//		getFlag(stp);
+		
 		
 //		receive synack
 		incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 		socket.receive(incomingPacket);
 		recvObj = STP.deserialize(incomingPayload);
-//		getFlag(((STP) recvObj));
+		recvSeq = ((STP)recvObj).getSeqNum();
+		recvAck = ((STP)recvObj).getAckNum();
+		if (((STP)recvObj).getData() == null) dataLength = 0;
+		logger("rcv", "SA", recvSeq, dataLength, recvAck);
+		
 		
 //		send ack packet
-		stp = new STP(false, true, false, 1, 1, mss);
+		outSeq = recvAck;
+		outAck = recvSeq+1;
+		stp = new STP(false, true, false, outSeq, outAck, mss);
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
+		if (stp.getData() == null) dataLength = 0;
+		logger("snd", "S", outSeq, dataLength, outAck);
 		socket.send(outgoingPacket);
-//		getFlag(stp);
 		
 		
 		try {
-		Thread.sleep(100);
+		Thread.sleep(1);
 		}catch(Exception e){}
 		
 		return stp;
@@ -427,6 +501,7 @@ public class Sender {
 		int outAckNum = currAck;
 		int recvSeqNum = -1;
 		int recvAckNum = -1;
+		int dataLength= 0;
 		int end = 0;
 		
 //		System.out.print("seq = "+outSeqNum+"\tack = "+outAckNum);
@@ -434,6 +509,9 @@ public class Sender {
 		stp = new STP(false, false, true, outSeqNum, outAckNum, mss);
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
+		if (stp.getData() == null) dataLength = 0;
+		else dataLength = stp.getData().length;
+		logger("snd", "F", outSeqNum, dataLength, outAckNum);
 		socket.send(outgoingPacket);
 		getFlag(stp);
 		
@@ -441,15 +519,23 @@ public class Sender {
 		incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 		socket.receive(incomingPacket);
 		recvObj = STP.deserialize(incomingPayload);
+		recvSeqNum = ((STP)recvObj).getSeqNum();
+		recvAckNum = ((STP)recvObj).getAckNum();
+		if (((STP)recvObj).getData() == null) dataLength = 0;
+		else dataLength = ((STP)recvObj).getData().length;
+		logger("rcv", "A", recvSeqNum, dataLength, recvAckNum);
 		getFlag(((STP) recvObj));
 		
 //		receive fin packet
 		incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 		socket.receive(incomingPacket);
 		recvObj = STP.deserialize(incomingPayload);
-		getFlag(((STP) recvObj));
 		recvSeqNum = ((STP)recvObj).getSeqNum();
 		recvAckNum = ((STP)recvObj).getAckNum();
+		if (((STP)recvObj).getData() == null) dataLength = 0;
+		else dataLength = ((STP)recvObj).getData().length;
+		logger("rcv", "F", recvSeqNum, dataLength, recvAckNum);
+		getFlag(((STP) recvObj));
 		
 //		send ack packet
 		outSeqNum = recvAckNum;
@@ -457,6 +543,9 @@ public class Sender {
 		stp = new STP(false, true, false, outSeqNum, outAckNum, mss);
 		outgoingPayload = stp.serialize();
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
+		if (stp.getData() == null) dataLength = 0;
+		else dataLength = stp.getData().length;
+		logger("snd", "A", outSeqNum, dataLength, outAckNum);
 		socket.send(outgoingPacket);
 		getFlag(stp);
 		

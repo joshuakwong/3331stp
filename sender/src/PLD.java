@@ -25,7 +25,6 @@ public class PLD {
 	
 	public String action(STP packet) {
 		random = rand.nextFloat();
-//		random = 1; System.out.println();
 		
 		if (random < pDrop) {
 			return "drop";

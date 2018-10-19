@@ -5,8 +5,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
-import java.util.zip.CRC32;
-
+import java.util.zip.Adler32;
 
 public class STP implements Serializable{
 	
@@ -70,16 +69,15 @@ public class STP implements Serializable{
 		return oIn.readObject();
 	}
 	
-	private long genChecksum(byte[] data) {
-		long res = 0;
-		CRC32 checksum = new CRC32();
+	public long genChecksum(byte[] data) {
+
+		long result = 0;
+		Adler32 checksum = new Adler32();
 		checksum.update(data);
-		res = checksum.getValue();
-//		System.out.println(res);
+		result = checksum.getValue();
 		
-		return res;
+		return result;
 	}
-	
 	
 	public long getChecksum() {
 		return checksum;
