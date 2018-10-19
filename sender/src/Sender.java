@@ -304,8 +304,6 @@ public class Sender {
 		}finally {
 			if (out != null) out.close();
 		}
-
-		
 	}
 
 
