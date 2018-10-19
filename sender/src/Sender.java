@@ -41,6 +41,18 @@ public class Sender {
 	public static PLD pldModule = null;
 	public static long startTime = 0;
 	
+	public static int countSegTransmitted = 0;
+	public static int countSegThruPLD = 0;
+	public static int countDropped = 0;
+	public static int countCorrupted = 0;
+	public static int countReordered = 0;
+	public static int countDuplicated = 0;
+	public static int countDelayed = 0;
+	public static int countTimeoutRetran = 0;
+	public static int countFastRetran = 0;
+	public static int countDuplAck = 0;
+	
+	
 
 	public static void main (String[] args) throws Exception{
 		if (args.length != 14) {
@@ -89,26 +101,17 @@ public class Sender {
 		currAck = 1;
 		sendPacket(segments);
 		finnConn();
-		
+		summary(buffer.length);
 		return;
 	}
 
 	
-	
 	private static void sendPacket (FilePacket[] segments) throws IOException, ClassNotFoundException {
-		Object recvObj = null;
-		DatagramPacket incomingPacket = null;
 		
-		byte[] incomingPayload = new byte[5000];
-		int outSeqNum = currSeq;
-		int outAckNum = currAck;
-//		int recvSeqNum = -1;
-//		int recvAckNum = -1;
 		
 		Listener listener = new Listener(socket);
 		Thread listenerThread = new Thread(listener);
 		listenerThread.start();
-		
 		
 		
 		pldModule = new PLD(pDrop, pDupl, pCorr, pOrder, pDelay, seed);
@@ -119,7 +122,8 @@ public class Sender {
 				while (checkAllAck() == true) {
 					if (Sender.firstSegment.getAckCount() >= 2) {
 						try {
-							Sender.sendAction(0, pldModule, true, false);
+							Sender.sendAction(0, pldModule, true);
+							Sender.countFastRetran++;
 						} catch (IOException e) {}
 						Sender.firstSegment.setAckCount(-1);
 					}
@@ -127,7 +131,8 @@ public class Sender {
 					for (i=0; i<Sender.segments.length; i++) {
 						if (Sender.segments[i].getAckCount() >= 2) {
 							try {
-								Sender.sendAction(i+1, pldModule, true, false);
+								Sender.sendAction(i+1, pldModule, true);
+								Sender.countFastRetran++;
 							} catch (IOException e) {}
 							Sender.segments[i].setAckCount(-1);
 						}
@@ -158,14 +163,8 @@ public class Sender {
 				if ((last = checkTimeout()) != -1) {
 					System.out.println("\ntimeout now send: "+ last);
 					for (int y=0; y < (mws/mss); y++) {
-						if ((y+last) == (reorderExpPos-maxOrder)) {
-							reorderExpPos = -1;
-							reorderedPacket = null;
-							sendAction((y+last), pldModule, true, true);
-						}
-						else {
-							sendAction((y+last), pldModule, true, false);
-						}
+						sendAction((y+last), pldModule, true);
+						countTimeoutRetran++;
 					}
 				}
 				try {
@@ -174,7 +173,7 @@ public class Sender {
 			}
 			System.out.println();
 			
-			sendAction(i, pldModule, false, false);
+			sendAction(i, pldModule, false);
 			
 			
 /**
@@ -187,6 +186,10 @@ public class Sender {
 			if (reorderExpPos == i) {
 				int originalPos = reorderExpPos-maxOrder;
 				if (segments[originalPos].isAckedFlag() == false) {
+					int seq = calcSeqNum(i);
+					logger("snd/rord", "D", seq, segments[i].getData().length, 1);
+					System.out.println("[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[ reordering packed");
+					countReordered++;
 					socket.send(reorderedPacket);
 				}
 				reorderExpPos = -1;
@@ -203,10 +206,11 @@ public class Sender {
 					if ((y+last) == (reorderExpPos-maxOrder)) {
 						reorderExpPos = -1;
 						reorderedPacket = null;
-						sendAction((y+last), pldModule, true, true);
+						sendAction((y+last), pldModule, true);
 					}
 					else 
-						sendAction((y+last), pldModule, true, false);
+						sendAction((y+last), pldModule, true);
+					countTimeoutRetran++;
 				}
 			}
 			try {
@@ -223,10 +227,11 @@ public class Sender {
 					if ((last) == (reorderExpPos-maxOrder)) {
 						reorderExpPos = -1;
 						reorderedPacket = null;
-						sendAction(last, pldModule, true, true);
+						sendAction(last, pldModule, true);
 					}
 					else
-						sendAction(last, pldModule, true, false);
+						sendAction(last, pldModule, true);
+					countTimeoutRetran++;
 				}
 				try {
 					Thread.sleep(1);
@@ -246,7 +251,7 @@ public class Sender {
 		System.out.println("-----------------ending sendFile-----------------");
 	}
 
-	private static void sendAction(int segCount, PLD pldModule, boolean rxt, boolean rord) throws IOException{
+	private static void sendAction(int segCount, PLD pldModule, boolean rxt) throws IOException{
 		String inst = null;
 		STP stp = null;
 		int outSeqNum;
@@ -254,7 +259,8 @@ public class Sender {
 		int dataLength = 0;
 		DatagramPacket outgoingPacket = null;
 		byte[] outgoingPayload = null;
-		
+
+		Sender.countSegTransmitted++;
 		outSeqNum = calcSeqNum(segCount);
 		outAckNum = 1;
 		
@@ -270,10 +276,38 @@ public class Sender {
 		
 		System.out.println("Sender: sending segment   "+segCount+"  outSeqNum: "+outSeqNum+"\t expcSeqNum: "
 		+(outSeqNum+segments[segCount].getData().length)+"\t inst: "+ inst);
-		determinePLD(inst, outgoingPacket, segCount, outSeqNum, outAckNum, dataLength, rxt, rord);
+		determinePLD(inst, outgoingPacket, segCount, outSeqNum, outAckNum, dataLength, rxt);
 		
 	}
 	
+
+	private static void summary(int size) throws IOException {
+		BufferedWriter out = null;
+		try {
+			FileWriter fStream = new FileWriter("Sender_log.txt", true);
+			out = new BufferedWriter(fStream);
+			out.write("=============================================================\n");
+			out.write("Size of the file (in Bytes)\t\t\t\t"+size+"\n");
+			out.write("Segments transmitted (including drop & RXT)\t\t"+countSegTransmitted+"\n");
+			out.write("Number of Segments handled by PLD\t\t\t"+countSegThruPLD+"\n");
+			out.write("Number of Segments dropped\t\t\t\t"+countDropped+"\n");
+			out.write("Number of Segments Corrupted\t\t\t\t"+countCorrupted+"\n");
+			out.write("Number of Segments Re-ordered\t\t\t\t"+countReordered+"\n");
+			out.write("Number of Segments Duplicated\t\t\t\t"+countDuplicated+"\n");
+			out.write("Number of Segments Delayed\t\t\t\t"+countDelayed+"\n");
+			out.write("Number of Retransmission due to TIMEOUT\t\t\t"+countTimeoutRetran+"\n");
+			out.write("Number of FAST RETRANSMISSION\t\t\t\t"+countFastRetran+"\n");
+			out.write("Number of DUP ACKS received\t\t\t\t"+countDuplAck+"\n" );
+			out.write("=============================================================\n");
+			
+		} catch (IOException e) {
+		}finally {
+			if (out != null) out.close();
+		}
+
+		
+	}
+
 
 	public static void logger(String event, String type, int seqNum, int length, int ackNum) throws IOException {
 		BufferedWriter out = null;
@@ -295,8 +329,7 @@ public class Sender {
 		}
 	}
 	
-	
-	private static void determinePLD(String inst, DatagramPacket outgoingPacket, int position, int seqNum, int ackNum, int length, boolean rxt, boolean rord) throws IOException {
+	private static void determinePLD(String inst, DatagramPacket outgoingPacket, int position, int seqNum, int ackNum, int length, boolean rxt) throws IOException {
 		
 		
 		if (inst == "send") {
@@ -307,9 +340,8 @@ public class Sender {
 		}
 		
 		if (inst == "corr") {
-//			if (rxt == false) 
 			logger("snd/corr", "D", seqNum, length, ackNum);
-//			else logger("snd/RXT/corr", "D", seqNum, length, ackNum);
+			countCorrupted++;
 			socket.send(outgoingPacket);
 			return;
 		}
@@ -321,9 +353,8 @@ public class Sender {
 					try {
 						int sleep = new Random().nextInt(maxDelay)+1;
 						Thread.sleep(sleep);
-//						if (rxt == false) 
 						logger("snd/delay", "D", seqNum, length, ackNum);
-//						else logger("snd/RXT/delay", "D", seqNum, length, ackNum);
+						countDelayed++;
 						Sender.socket.send(outgoingPacket);
 					} catch (InterruptedException | IOException e) {
 						e.printStackTrace();
@@ -335,21 +366,17 @@ public class Sender {
 		}
 		
 		if (inst == "drop") {
-//			if (rxt == false) 
 			logger("drop", "D", seqNum, length, ackNum);
-//			else logger("RXT/drop", "D", seqNum, length, ackNum);
+			countDelayed++;
 			return;
 		}
 		
 		if (inst == "dupl") {
-//			if (rxt == false) 
 			logger("snd", "D", seqNum, length, ackNum);
-//			else logger("snd/RXT", "D", seqNum, length, ackNum);
 			socket.send(outgoingPacket);
-//			if (rxt == false) 
 			logger("snd/dupl", "D", seqNum, length, ackNum);
-//			else logger("snd/RXT/dupl", "D", seqNum, length, ackNum);
 			socket.send(outgoingPacket);
+			countDuplicated++;
 			return;
 		}
 
@@ -367,16 +394,15 @@ public class Sender {
 			}
 			
 			else {
-//				if (position+(mws/mss) < segments.length) reorderExpPos = position+(mws/mss);
 //				else reorderExpPos = segments.length;
 				reorderExpPos = position+(mws/mss);
 				reorderedPacket = outgoingPacket;
 			}	
 		}
-		
-		
+
 		return;
 	}
+	
 	
 	/*
 	 * check if the leftmost unacked packet has timeout yet
@@ -460,6 +486,7 @@ public class Sender {
 		if (stp.getData() == null) dataLength = 0;
 		logger("snd", "S", outSeq, dataLength, outAck);
 		socket.send(outgoingPacket);
+		countSegTransmitted++;
 		
 		
 //		receive synack
@@ -481,6 +508,7 @@ public class Sender {
 		if (stp.getData() == null) dataLength = 0;
 		logger("snd", "S", outSeq, dataLength, outAck);
 		socket.send(outgoingPacket);
+		countSegTransmitted++;
 		
 		
 		try {
@@ -513,6 +541,7 @@ public class Sender {
 		else dataLength = stp.getData().length;
 		logger("snd", "F", outSeqNum, dataLength, outAckNum);
 		socket.send(outgoingPacket);
+		countSegTransmitted++;
 		getFlag(stp);
 		
 //		receive ack packet
@@ -547,6 +576,7 @@ public class Sender {
 		else dataLength = stp.getData().length;
 		logger("snd", "A", outSeqNum, dataLength, outAckNum);
 		socket.send(outgoingPacket);
+		countSegTransmitted++;
 		getFlag(stp);
 		
 		return;

@@ -45,6 +45,7 @@ public class Listener implements Runnable{
 						Sender.logger("rcv/DA", "A",  recvSeqNum, 0, recvAckNum);
 						int old = Sender.firstSegment.getAckCount();
 						Sender.firstSegment.setAckCount(old+1);
+						Sender.countDuplAck++;
 					}
 				}
 
@@ -60,6 +61,7 @@ public class Listener implements Runnable{
 					Sender.logger("rcv/DA", "A",  recvSeqNum, 0, recvAckNum);
 					int old = Sender.segments[recvSeg].getAckCount();
 					Sender.segments[recvSeg].setAckCount(old+1);
+					Sender.countDuplAck++;
 				}
 				
 //				ack assumption

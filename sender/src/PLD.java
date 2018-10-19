@@ -25,6 +25,7 @@ public class PLD {
 	
 	public String action(STP packet) {
 		random = rand.nextFloat();
+		Sender.countSegThruPLD++;
 		
 		if (random < pDrop) {
 			return "drop";
