@@ -41,6 +41,11 @@ public class Sender {
 	public static PLD pldModule = null;
 	public static long startTime = 0;
 	
+	public static long sampleRTT = -1;
+	public static long estRTT = 500;
+	public static long devRTT = 250;
+	public static long timeoutInterval = -1;
+	
 	public static int countSegTransmitted = 0;
 	public static int countSegThruPLD = 0;
 	public static int countDropped = 0;
@@ -119,22 +124,26 @@ public class Sender {
 		Thread fastRetrans = new Thread(new Runnable(){
 			@Override
 			public void run() {
-				while (checkAllAck() == true) {
-					if (Sender.firstSegment.getAckCount() >= 2) {
+				while (checkAllAck() == false) {
+					if (Sender.firstSegment.getAckCount() >= 3) {
 						try {
 							Sender.sendAction(0, pldModule, true);
 							Sender.countFastRetran++;
 						} catch (IOException e) {}
 						Sender.firstSegment.setAckCount(-1);
+						Sender.firstSegment.setResendFlag(true);
 					}
 					int i=0;
 					for (i=0; i<Sender.segments.length; i++) {
-						if (Sender.segments[i].getAckCount() >= 2) {
+//						System.out.print("fast retran is doing shit\r");
+						if (Sender.segments[i].getAckCount() >= 3) {
 							try {
+								System.out.println("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>packet fast retransmit");
 								Sender.sendAction(i+1, pldModule, true);
 								Sender.countFastRetran++;
 							} catch (IOException e) {}
 							Sender.segments[i].setAckCount(-1);
+							Sender.segments[i].setResendFlag(true);
 						}
 					}
 				}
@@ -164,6 +173,7 @@ public class Sender {
 					System.out.println("\ntimeout now send: "+ last);
 					for (int y=0; y < (mws/mss); y++) {
 						sendAction((y+last), pldModule, true);
+						segments[y+last].setResendFlag(true);
 						countTimeoutRetran++;
 					}
 				}
@@ -210,6 +220,7 @@ public class Sender {
 					}
 					else 
 						sendAction((y+last), pldModule, true);
+					segments[y+last].setResendFlag(true);
 					countTimeoutRetran++;
 				}
 			}
@@ -231,6 +242,7 @@ public class Sender {
 					}
 					else
 						sendAction(last, pldModule, true);
+					segments[last].setResendFlag(true);
 					countTimeoutRetran++;
 				}
 				try {
@@ -306,7 +318,6 @@ public class Sender {
 		}
 	}
 
-
 	public static void logger(String event, String type, int seqNum, int length, int ackNum) throws IOException {
 		BufferedWriter out = null;
 		String toWrite = null;
@@ -328,7 +339,6 @@ public class Sender {
 	}
 	
 	private static void determinePLD(String inst, DatagramPacket outgoingPacket, int position, int seqNum, int ackNum, int length, boolean rxt) throws IOException {
-		
 		
 		if (inst == "send") {
 			if (rxt == false) logger("snd", "D", seqNum, length, ackNum);
@@ -365,7 +375,7 @@ public class Sender {
 		
 		if (inst == "drop") {
 			logger("drop", "D", seqNum, length, ackNum);
-			countDelayed++;
+			countDropped++;
 			return;
 		}
 		
@@ -381,10 +391,8 @@ public class Sender {
 		if (inst == "reorder") {
 //			store the packet in a variable, along with the position.
 //			if reach that position, use sendPacket to send it
-			
 //			if there are staged packet already, send the packet right away
 			if (reorderedPacket != null) {
-//				System.out.println("exists reordering packet previously: "+(reorderExpPos-maxOrder));
 				if (rxt == false) logger("snd", "D", seqNum, length, ackNum);
 				else logger("snd/RXT", "D", seqNum, length, ackNum);
 				socket.send(outgoingPacket);
@@ -392,7 +400,6 @@ public class Sender {
 			}
 			
 			else {
-//				else reorderExpPos = segments.length;
 				reorderExpPos = position+(mws/mss);
 				reorderedPacket = outgoingPacket;
 			}	
@@ -402,13 +409,15 @@ public class Sender {
 	}
 	
 	
-	/*
+/*
 	 * check if the leftmost unacked packet has timeout yet
 	 */
 	private static int checkTimeout() {
+		getSampleRTT();
 		long currTime = System.currentTimeMillis();
 		int firstUnackedPackage = firstUnacked();
-		long timeoutInterval = 500 + (gamma*250);
+//		long timeoutInterval = 500 + (gamma*250);
+		long timeoutInterval = calcTimeoutInterval();
 		
 		if (firstUnackedPackage == -1) return -1;
 		
@@ -418,12 +427,35 @@ public class Sender {
 		return -1;
 	}
 	
+	private static long getSampleRTT() {
+		for (int i=(segments.length-1); i>=0; i--) {
+			if (segments[i].isResendFlag() == false && segments[i].isAckedFlag() == true) { 
+				long sampleRTT = segments[i].getEndTime() - segments[i].getStartTime(); 
+				return sampleRTT;
+			}
+		}
+		
+		return -1;
+	}
+	
+	private static long calcTimeoutInterval() {
+		sampleRTT = getSampleRTT();
+		if (sampleRTT != -1) {
+			estRTT = estRTT*7/8 + sampleRTT/8;
+			devRTT = devRTT*3/4 + Math.abs(sampleRTT-estRTT)/4;
+		}
+		timeoutInterval = estRTT + devRTT*gamma;
+		
+		return timeoutInterval;
+	}
+	
 	private static int firstUnacked() {
 		for (int i=0; i<segments.length; i++) 
 			if (segments[i].isAckedFlag() == false) return i;
 		
 		return -1;
 	}
+	
 	
 	private static boolean checkWindow() {
 		int countSentFlags = 0;
@@ -464,6 +496,7 @@ public class Sender {
 	}
 	
 		
+	
 	private static STP initConn () throws IOException, ClassNotFoundException  {
 		STP stp = null;
 		Object recvObj = null;
@@ -515,6 +548,7 @@ public class Sender {
 		
 		return stp;
 	}
+	
 	
 	private static void finnConn() throws IOException, ClassNotFoundException {
 		STP stp = null;
@@ -678,6 +712,7 @@ public class Sender {
 	}
 
 //	debugging function
+	
 	
 	
 	private static void getFlag(STP obj) {

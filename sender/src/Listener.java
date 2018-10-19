@@ -39,6 +39,7 @@ public class Listener implements Runnable{
 						Sender.logger("rcv", "A",  recvSeqNum, 0, recvAckNum);
 						Sender.firstSegment.setAckedFlag(true);
 						Sender.firstSegment.setAckCount(0);
+						Sender.firstSegment.setEndTime(System.currentTimeMillis());
 					}
 					
 					else {
@@ -54,6 +55,7 @@ public class Listener implements Runnable{
 					Sender.logger("rcv", "A",  recvSeqNum, 0, recvAckNum);
 					Sender.segments[recvSeg].setAckedFlag(true);
 					Sender.segments[recvSeg].setAckCount(0);
+					Sender.segments[recvSeg].setEndTime(System.currentTimeMillis());
 				}
 				
 //				receiving same ack for a segment 
@@ -70,6 +72,7 @@ public class Listener implements Runnable{
 					for (int i=firstUnackSeg; i<=recvSeg; i++) {
 						Sender.segments[i].setAckedFlag(true);
 						Sender.segments[i].setAckCount(0);
+						Sender.segments[i].setEndTime(System.currentTimeMillis());
 					}
 				}
 				exit = checkAllAck();
@@ -77,6 +80,10 @@ public class Listener implements Runnable{
 				System.out.println("\nListener: received ack " + recvAckNum+"   recvSeg: "+recvSeg
 						+"   firstUnacked: "+firstUnack());
 				
+//				System.out.println("reacked flag states");
+//				for (FilePacket seg : Sender.segments) {
+//					System.out.print(seg.getAckCount()+"_ ");
+//				}
 			} catch (IOException | ClassNotFoundException e) {
 				e.printStackTrace();
 			}

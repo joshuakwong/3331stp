@@ -201,7 +201,6 @@ public class Receiver {
 			toWrite = event+"     \t\t\t"+time+"\t\t"+type+"\t\t"+seqNum+"\t\t"+length+"\t\t"+ackNum+"\n";
 		else
 			toWrite = event+"     \t\t\t"+time+"\t\t"+type+"\t\t"+seqNum+"\t\t"+length+"\t\t"+ackNum+"\n";
-//		System.out.println(toWrite);
 		
 		try {
 			FileWriter fStream = new FileWriter("Receiver_log.txt", true);

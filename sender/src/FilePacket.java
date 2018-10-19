@@ -6,9 +6,11 @@ public class FilePacket {
 	private int endNum;
 	private boolean sentFlag;
 	private boolean ackedFlag;
+	private boolean resendFlag;
 	private int expAck;
 	private int ackCount;
 	private long startTime;
+	private long endTime;
 	
 	FilePacket(byte[] data, int startNum, int endNum) {
 		this.data = data;
@@ -16,10 +18,13 @@ public class FilePacket {
 		this.endNum = endNum;
 		this.sentFlag = false;
 		this.ackedFlag = false;
+		this.setResendFlag(false);
 		this.expAck = -1;
 		this.ackCount = -1;
 		this.setStartTime(0);
+		this.endTime = 0;
 	}
+
 
 	public byte[] getData() {
 		return data;
@@ -83,6 +88,22 @@ public class FilePacket {
 
 	public void setAckCount(int ackCount) {
 		this.ackCount = ackCount;
+	}
+
+	public long getEndTime() {
+		return endTime;
+	}
+
+	public void setEndTime(long endTime) {
+		this.endTime = endTime;
+	}
+
+	public boolean isResendFlag() {
+		return resendFlag;
+	}
+
+	public void setResendFlag(boolean resendFlag) {
+		this.resendFlag = resendFlag;
 	}
 
 }
