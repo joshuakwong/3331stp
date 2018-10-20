@@ -56,8 +56,8 @@ public class Sender {
 	public static int countTimeoutRetran = 0;
 	public static int countFastRetran = 0;
 	public static int countDuplAck = 0;
-	
-	
+	public static Listener listener = null;
+	public static Thread listenerThread = null;
 
 	public static void main (String[] args) throws Exception{
 		if (args.length != 14) {
@@ -114,8 +114,8 @@ public class Sender {
 	private static void sendPacket (FilePacket[] segments) throws IOException, ClassNotFoundException {
 		
 		
-		Listener listener = new Listener(socket);
-		Thread listenerThread = new Thread(listener);
+		listener = new Listener(socket);
+		listenerThread = new Thread(listener);
 		listenerThread.start();
 		
 		
@@ -362,7 +362,7 @@ public class Sender {
 					try {
 						int sleep = new Random().nextInt(maxDelay)+1;
 						Thread.sleep(sleep);
-						if (socket.isClosed() == false) {
+						if (checkAllAck() == false) {
 							Sender.socket.send(outgoingPacket);
 							logger("snd/dely", "D", seqNum, length, ackNum);
 							countDelayed++;
@@ -371,6 +371,12 @@ public class Sender {
 						e.printStackTrace();
 					}
 				} 
+				public boolean checkAllAck() {
+					for (int i=0; i<Sender.segments.length; i++) 
+						if (Sender.segments[i].isAckedFlag() == false) return false;
+					
+					return true;
+				}
 			}); 
 			threadhandle.start();
 			return;
