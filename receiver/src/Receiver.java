@@ -141,17 +141,15 @@ public class Receiver {
 //				System.out.print("not in order pkt\t | ");
 				logger("rcv", "D", recvSeqNum, recvBuffLength, recvAckNum);
 
-				
 				if (existsInList(masterBufferList, recvSeqNum) == false && existsInList(secondaryBufferList, recvSeqNum) == false) 
 					pushToList(secondaryBufferList, seg);
-				else {
-					countDupSeg++;
-
-				}
 				
-				while (mergable(masterBufferList, secondaryBufferList, mss)) {
+				else 
+					countDupSeg++;
+				
+				while (mergable(masterBufferList, secondaryBufferList, mss)) 
 					mergeList(masterBufferList, secondaryBufferList);
-				}
+				
 				if (masterBufferList.size() > 0)
 					outAckNum = masterBufferList.get(masterBufferList.size()-1).getRecvSeq()
 					+masterBufferList.get(masterBufferList.size()-1).getLength();
@@ -176,7 +174,7 @@ public class Receiver {
 //			for (RecvSegment item : secondaryBufferList) 
 //				System.out.print(item.getRecvSeq()+"_");
 //			System.out.println();
-			
+//			
 //			System.out.println("-------------------------------------------------");
 		}
 		

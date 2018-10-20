@@ -258,6 +258,9 @@ public class Sender {
 				Thread.sleep(1);
 			} catch (Exception e) {}
 		}
+//		try {
+//			Thread.sleep(100);
+//		}catch (Exception e) {};
 		
 		System.out.println("currAck = "+currAck+"  currSeq = "+currSeq);
 		System.out.println("-----------------ending sendFile-----------------");
@@ -589,8 +592,14 @@ public class Sender {
 		incomingPacket = new DatagramPacket(incomingPayload, MAXSIZE);
 		socket.receive(incomingPacket);
 		recvObj = STP.deserialize(incomingPayload);
+		while(((STP)recvObj).getAckNum() <= outSeqNum) {
+			socket.receive(incomingPacket);
+			recvObj = STP.deserialize(incomingPayload);
+		}
 		recvSeqNum = ((STP)recvObj).getSeqNum();
 		recvAckNum = ((STP)recvObj).getAckNum();
+//		System.out.println(recvSeqNum+"   "+recvAckNum);
+		
 		if (((STP)recvObj).getData() == null) dataLength = 0;
 		else dataLength = ((STP)recvObj).getData().length;
 		logger("rcv", "A", recvSeqNum, dataLength, recvAckNum);
