@@ -91,7 +91,7 @@ public class Receiver {
 			mss = ((STP)recvObj).getMss();
 			checksum = ((STP)recvObj).getChecksum();
 			
-			System.out.print("recvSeqNum: "+recvSeqNum+"\t");
+//			System.out.print("recvSeqNum: "+recvSeqNum+"\t");
 
 			generatedChecksum = ((STP)recvObj).genChecksum(recvBuffArray);
 			
@@ -99,7 +99,7 @@ public class Receiver {
 			
 //			checksum mismatch, duplicated packet
 			if (checksum != generatedChecksum) {
-				System.out.println("packed corrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrupted");
+//				System.out.println("packed corrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrupted");
 				countSegBitError++;
 				logger("rcv/corr", "D", recvSeqNum, recvBuffLength, recvAckNum);
 				continue;
@@ -108,14 +108,14 @@ public class Receiver {
 //			packets arrive in order
 			else if (recvSeqNum == expcSeq) {
 				logger("rcv", "D", recvSeqNum, recvBuffLength, recvAckNum);
-				System.out.print("In order pkt\t | ");
+//				System.out.print("In order pkt\t | ");
 //				send ack packet
 				outSeqNum = recvAckNum;
 				outAckNum = recvSeqNum + recvBuffLength;
 				
 				
 				if (existsInList(masterBufferList, recvSeqNum) == false && existsInList(secondaryBufferList, recvSeqNum) == false) {
-					System.out.println("pushing to master");
+//					System.out.println("pushing to master");
 					pushToList(masterBufferList, seg);
 				}
 				
@@ -133,12 +133,12 @@ public class Receiver {
 				outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, senderAddr, senderPort);
 				socket.send(outgoingPacket);
 				logger("snd", "A", outSeqNum, 0, outAckNum);
-				System.out.println("ack back: "+outAckNum);
+//				System.out.println("ack back: "+outAckNum);
 				
 			}
 
 			else {
-				System.out.print("not in order pkt\t | ");
+//				System.out.print("not in order pkt\t | ");
 				logger("rcv", "D", recvSeqNum, recvBuffLength, recvAckNum);
 
 				
@@ -162,7 +162,7 @@ public class Receiver {
 				socket.send(outgoingPacket);
 				countDupAck++;
 				logger("snd/DA", "A", outSeqNum, 0, outAckNum);
-				System.out.println("ack back: "+outAckNum);
+//				System.out.println("ack back: "+outAckNum);
 				
 				
 			}
@@ -177,9 +177,10 @@ public class Receiver {
 //				System.out.print(item.getRecvSeq()+"_");
 //			System.out.println();
 			
-			System.out.println("-------------------------------------------------");
+//			System.out.println("-------------------------------------------------");
 		}
-
+		
+		System.out.println("=================================breake out of loop==================================");
 //		generate pdf with buffer
 		
 		byte[] pdfData = toArray(masterBufferList);

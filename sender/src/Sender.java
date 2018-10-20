@@ -138,7 +138,7 @@ public class Sender {
 //						System.out.print("fast retran is doing shit\r");
 						if (Sender.segments[i].getAckCount() >= 3) {
 							try {
-								System.out.println("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>packet fast retransmit");
+//								System.out.println("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>packet fast retransmit");
 								Sender.sendAction(i+1, pldModule, true);
 								Sender.countFastRetran++;
 							} catch (IOException e) {}
@@ -167,10 +167,10 @@ public class Sender {
 //			if reached, trap in loop and sleep
 			while (checkWindow() == true) {
 	
-				System.out.print("----------mss reached----------\r");
+//				System.out.print("----------mss reached----------\r");
 				int last = 0;
 				if ((last = checkTimeout()) != -1) {
-					System.out.println("\ntimeout now send: "+ last);
+//					System.out.println("\ntimeout now send: "+ last);
 					for (int y=0; y < (mws/mss); y++) {
 						sendAction((y+last), pldModule, true);
 						segments[y+last].setResendFlag(true);
@@ -181,7 +181,7 @@ public class Sender {
 					Thread.sleep(1);
 				}catch (Exception e) {}
 			}
-			System.out.println();
+//			System.out.println();
 			
 			sendAction(i, pldModule, false);
 			
@@ -198,7 +198,7 @@ public class Sender {
 				if (segments[originalPos].isAckedFlag() == false) {
 					int seq = calcSeqNum(i);
 					logger("snd/rord", "D", seq, segments[i].getData().length, 1);
-					System.out.println("[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[ reordering packed");
+//					System.out.println("[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[ reordering packed");
 					countReordered++;
 					socket.send(reorderedPacket);
 				}
@@ -210,7 +210,7 @@ public class Sender {
 
 		int last = 0;
 		while (checkWindow() == true) {
-			System.out.print("----------mss reached----------\r");
+//			System.out.print("----------mss reached----------\r");
 			if ((last = checkTimeout()) != -1) {
 				for (int y=0; y < (mws/mss); y++) {
 					if ((y+last) == (reorderExpPos-maxOrder)) {
@@ -286,14 +286,15 @@ public class Sender {
 		outgoingPayload = stp.serialize();	
 		outgoingPacket = new DatagramPacket(outgoingPayload, outgoingPayload.length, recvHost, recvPort);
 		
-		System.out.println("Sender: sending segment   "+segCount+"  outSeqNum: "+outSeqNum+"\t expcSeqNum: "
-		+(outSeqNum+segments[segCount].getData().length)+"\t inst: "+ inst);
+//		System.out.println("Sender: sending segment   "+segCount+"  outSeqNum: "+outSeqNum+"\t expcSeqNum: "
+//		+(outSeqNum+segments[segCount].getData().length)+"\t inst: "+ inst);
 		determinePLD(inst, outgoingPacket, segCount, outSeqNum, outAckNum, dataLength, rxt);
 		
 	}
 	
 
 	private static void summary(int size) throws IOException {
+		socket.close();
 		BufferedWriter out = null;
 		try {
 			FileWriter fStream = new FileWriter("Sender_log.txt", true);
@@ -322,10 +323,10 @@ public class Sender {
 		BufferedWriter out = null;
 		String toWrite = null;
 		double time = (double)(System.currentTimeMillis()-startTime)/1000;
-		if (event == "rcv" || event == "snd") 
-			toWrite = event+"     \t\t\t"+time+"\t\t"+type+"\t\t"+seqNum+"\t\t"+length+"\t\t"+ackNum+"\n";
+		if (event == "snd/dely" || event == "snd/corr" || event == "snd/dupl" || event == "snd/rord")
+			toWrite = event+"\t\t"+time+"\t\t"+type+"\t\t"+seqNum+"\t\t"+length+"\t\t"+ackNum+"\n";
 		else
-			toWrite = event+"     \t\t\t"+time+"\t\t"+type+"\t\t"+seqNum+"\t\t"+length+"\t\t"+ackNum+"\n";
+			toWrite = event+"\t\t\t"+time+"\t\t"+type+"\t\t"+seqNum+"\t\t"+length+"\t\t"+ackNum+"\n";
 //		System.out.println(toWrite);
 		
 		try {
@@ -361,9 +362,11 @@ public class Sender {
 					try {
 						int sleep = new Random().nextInt(maxDelay)+1;
 						Thread.sleep(sleep);
-						logger("snd/delay", "D", seqNum, length, ackNum);
-						countDelayed++;
-						Sender.socket.send(outgoingPacket);
+						if (socket.isClosed() == false) {
+							Sender.socket.send(outgoingPacket);
+							logger("snd/dely", "D", seqNum, length, ackNum);
+							countDelayed++;
+						}
 					} catch (InterruptedException | IOException e) {
 						e.printStackTrace();
 					}
@@ -688,7 +691,7 @@ public class Sender {
 			return false;
 		}
 		
-		if (maxOrder < 1 || maxOrder > 6) {
+		if (pOrder >0 && (maxOrder < 1 || maxOrder > 6)) {
 			System.out.println("Error: pOrder (11th arg) needs to be between 1 and 6");
 			return false;
 		}

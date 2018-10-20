@@ -24,23 +24,23 @@ public class PLD {
 	
 	
 	public String action(STP packet) {
-		random = rand.nextFloat();
+//		random = rand.nextFloat();
 		Sender.countSegThruPLD++;
 		
-		if (random < pDrop) {
+		if (rand.nextFloat() < pDrop) {
 			return "drop";
 		}
-		if (random < pDupl) {
+		if (rand.nextFloat() < pDupl) {
 			return "dupl";
 		}
-		if (random < pCorr) {
+		if (rand.nextFloat() < pCorr) {
 			corrupt(packet);
 			return "corr";
 		}
-		if (random < pOrder) {
+		if (rand.nextFloat() < pOrder) {
 			return "reorder";
 		}
-		if (random < pDelay) {
+		if (rand.nextFloat() < pDelay) {
 			return "delay";
 		}
 		return "send";
